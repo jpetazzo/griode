@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import mido
+import subprocess
 import sys
+import time
 
 import colors
 import gridgets
@@ -32,10 +34,17 @@ def open_port_matching(string, in_or_out, get_port_names, open_port):
     print("Could not find any {} port matching {}."
             .format(in_or_out, string))
 
-synth_port = open_output_matching("gridpie")
-if synth_port is None:
-    print("You can start a synth with:")
-    print("fluidsynth -a pulseaudio -p gridpie ~/Downloads/Nice-Keys-B-JNv1.5.sf2")
+subprocess.Popen(
+        ["fluidsynth", "-a", "pulseaudio", "-p", "griode", "default.sf2"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE
+        )
+
+synth_port = None
+while synth_port is None:
+    synth_port = open_output_matching("griode")
+    if synth_port is None:
+        print("Could not connect to fluidsynth!")
+        time.sleep(1)
 
 grid = gridgets.Grid(
         midi_in=open_input_matching("MIDI 2"),
