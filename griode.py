@@ -34,10 +34,25 @@ def open_port_matching(string, in_or_out, get_port_names, open_port):
     print("Could not find any {} port matching {}."
             .format(in_or_out, string))
 
-subprocess.Popen(
+fluidsynth = subprocess.Popen(
         ["fluidsynth", "-a", "pulseaudio", "-p", "griode", "default.sf2"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
+
+programs = {}
+while fluidsynth.stdout.peek() != b"> ":
+    fluidsynth.stdout.readline()
+fluidsynth.stdin.write(b"inst 1\n")
+fluidsynth.stdin.flush()
+fluidsynth.stdout.readline()
+while fluidsynth.stdout.peek() != b"> ":
+    line = fluidsynth.stdout.readline()
+    bank_prog, program_name = line.split(b" ", 1)
+    bank, prog = [int(x) for x in bank_prog.split(b"-")]
+    print("{} -> {} -> {}".format(prog, bank, program_name))
+    if prog not in programs:
+        programs[prog] = {}
+    programs[prog][bank] = program_name
 
 synth_port = None
 while synth_port is None:
