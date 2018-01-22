@@ -31,6 +31,7 @@ class Grid(object):
         self.note_picker = NotePicker()
         self.instrument_picker = InstrumentPicker()
         self.color_picker = ColorPicker()
+        self.scale_picker = ScalePicker(self.note_picker)
         combo_map = {}
         for row in range(1, 4):
             for column in range (1, 9):
@@ -65,7 +66,7 @@ class Grid(object):
             if message.control == 94:
                 self.gridget.right()
             if message.control == 95: # session
-                pass
+                self.focus(self.scale_picker)
             if message.control == 96: # note
                 self.focus(self.note_picker)
             if message.control == 97: # device
@@ -267,7 +268,7 @@ class InstrumentPicker(Layout):
             self.led(r, c, self.color(r, c, True))
 
 
-class ColorPicker(object):
+class ColorPicker(Layout):
 
     def show(self):
         for row in range(1, 9):
@@ -279,6 +280,101 @@ class ColorPicker(object):
         if velocity > 0:
             print("Color #{}".format((row-1)*8 + column-1))
 
+class ScalePicker(Layout):
+    """
+    ##.###.. # of the key below
+    CDEFGAB. pick key
+    ........
+    ##.###.. # of the key below
+    CDEFGAB. keys in scale
+    ........
+    XXXXXXXX modes
+    XXXXXXXX scales
+    """
 
-# scale change mode
+    def __init__(self, note_picker):
+        self.note_picker = note_picker
+
+    def color(self, row, column, on_off):
+        if on_off:
+            return colors.RED
+        if row == 8 and column in [1, 2, 4, 5, 6]:
+            return colors.MAGENTA_PINK
+        if row == 7 and column != 8:
+            return colors.MAGENTA_PINK
+        if row == 5 and column in [1, 2, 4, 5, 6]:
+            return colors.BLUE_ORCHID
+        if row == 4 and column != 8:
+            return colors.BLUE_ORCHID
+        if row == 2 or row == 1:
+            try:
+                scales.palette[row-1][column-1]
+                return colors.SKY_OCEAN
+            except:
+                pass
+        return colors.BLACK
+
+    def rowcols(self): # return row,col that should be ON
+        lights = []
+
+        key = self.note_picker.key
+
+        row, column = note2piano[key]
+        lights.append((row+6, column))
+
+        scale = self.note_picker.scale
+        for note in scale:
+            row, column = note2piano[note]
+            lights.append((row+3, column))
+
+        for row,line in enumerate(scales.palette):
+            for column,scale in enumerate(line):
+                if scale == self.note_picker.scale:
+                    lights.append((row+1, column+1))
+
+        return lights
+
+    def pad(self, row, column, velocity):
+        if velocity == 0:
+            return
+        # Turn off leds for current scale etc.
+        for r,c in self.rowcols():
+            self.led(r, c, self.color(r, c, False))
+
+        # Change the key in which we're playing
+        if row in [7, 8]:
+            note = piano2note.get((row-6, column))
+            if note is not None:
+                self.note_picker.key = note
+
+        # Pick a scale from the palette
+        if row in [1, 2]:
+            try:
+                scale = scales.palette[row-1][column-1]
+                self.note_picker.scale = scale
+            except IndexError:
+                pass
+
+        # Turn on corresponding leds
+        for r,c in self.rowcols():
+            self.led(r, c, self.color(r, c, True))
+
+
+    def show(self):
+        for row in range(1, 9):
+            for column in range(1, 9):
+                self.led(row, column, self.color(row, column, False))
+        for r,c in self.rowcols():
+            self.led(r, c, self.color(r, c, True))
+
+# Maps notes to a pseudo-piano layout
+# (with black keys on the top row and white keys on the bottom row)
+
+note2piano = [
+    (1, 1), (2, 1), (1, 2), (2, 2), (1, 3),
+    (1, 4), (2, 4), (1, 5), (2, 5), (1, 6), (2, 6), (1, 7)
+    ]
+
+piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
+
 
