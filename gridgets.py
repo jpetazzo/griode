@@ -28,11 +28,11 @@ class Grid(object):
         self.grid_out = grid_out
         self.synth_out = synth_out
         self.gridget = None
-        self.grid_in.callback = self.process_message
         self.note_picker = NotePicker()
         self.instrument_picker = InstrumentPicker()
         self.color_picker = ColorPicker()
         self.focus(self.note_picker)
+        self.grid_in.callback = self.process_message
 
     def focus(self, gridget):
         self.gridget = gridget
@@ -189,16 +189,24 @@ class InstrumentPicker(Layout):
         # FIXME: deal with font and bank?
 
     def color(self, row, col, on_off):
-        if row in [7, 8]: # group
-            return colors.RED if on_off else colors.YELLOW_LO
-        if row in [2]: # instrument
-            return colors.RED if on_off else colors.ORCHID_LO
+        if on_off:
+            return colors.RED
+        if row == 8 and col==1:
+            return colors.ROSE
+        if row == 6 or row == 7:
+            return colors.AMBER_YELLOW
+        if row == 5:
+            return colors.LIME_GREEN
+        if row == 4 and col==1:
+            return colors.CYAN_SKY
         return colors.BLACK
 
     def rowcols(self):
         # Which leds are supposed to be ON for the current instrument
-        return [(8-(self.group//8), 1+self.group%8),
-                (2, 1+self.instrument)]
+        return [(8, 1+self.font),
+                (7-(self.group//8), 1+self.group%8),
+                (5, 1+self.instrument),
+                (4, 1+self.bank)]
 
     def show(self):
         for row in range(1, 9):
@@ -213,12 +221,16 @@ class InstrumentPicker(Layout):
         # Turn off leds for current instrument
         for r,c in self.rowcols():
             self.led(r, c, self.color(r, c, False))
-        if row==2:
-            self.instrument = col-1
-        if row==8:
-            self.group = col-1
+        if row==8: # FIXME font
+            pass
         if row==7:
+            self.group = col-1
+        if row==6:
             self.group = 8+col-1
+        if row==5:
+            self.instrument = col-1
+        if row==4: # FIXME bank
+            pass
         # Switch to new instrument
         self.change()
         # Turn on corresponding leds
@@ -233,6 +245,10 @@ class ColorPicker(object):
             for col in range(1, 9):
                 color = (row-1)*8 + col-1
                 self.led(row, col, color)
+
+    def pad(self, row, column, velocity):
+        if velocity > 0:
+            print("Color #{}".format((row-1)*8 + column-1))
 
 
 # scale change mode
