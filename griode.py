@@ -4,10 +4,7 @@ import subprocess
 import sys
 import time
 
-import colors
 import gridgets
-import notes
-import scales
 
 
 def open_input_matching(string):
@@ -62,42 +59,9 @@ while synth_port is None:
         time.sleep(1)
 
 grid = gridgets.Grid(
-        midi_in=open_input_matching("MIDI 2"),
-        midi_out=open_output_matching("MIDI 2"))
-
-note = gridgets.Note(grid, synth_port)
-prog = gridgets.ProgramChange(grid, synth_port)
-palette = gridgets.Palette(grid)
-
-grid.focus(note)
+        grid_in=open_input_matching("MIDI 2"),
+        grid_out=open_output_matching("MIDI 2"),
+        synth_out=synth_port)
 
 while True:
-    event = grid.midi_in.receive()
-    print(event)
-
-    if event.type == 'polytouch':
-        continue
-    
-    if event.type == 'control_change' and event.value == 127:
-        if event.control == 91:
-            grid.up()
-        if event.control == 92:
-            grid.down()
-        if event.control == 93:
-            grid.left()
-        if event.control == 94:
-            grid.right()
-        if event.control == 95: # session
-            pass
-        if event.control == 96: # note
-            grid.focus(note)
-        if event.control == 97: # device
-            grid.focus(prog)
-        if event.control == 98: # user
-            grid.focus(palette)
-
-    if event.type == 'note_on':
-        row, col = event.note//10, event.note%10
-        velocity = event.velocity
-        grid.touch(row, col, velocity)
-
+    time.sleep(1)
