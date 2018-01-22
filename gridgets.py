@@ -31,6 +31,14 @@ class Grid(object):
         self.note_picker = NotePicker()
         self.instrument_picker = InstrumentPicker()
         self.color_picker = ColorPicker()
+        combo_map = {}
+        for row in range(1, 4):
+            for column in range (1, 9):
+                combo_map[row, column] = self.note_picker
+        for row in range(4, 9):
+            for column in range (1, 9):
+                combo_map[row, column] = self.instrument_picker
+        self.combo_picker = ComboLayout(combo_map)
         self.focus(self.note_picker)
         self.grid_in.callback = self.process_message
 
@@ -61,7 +69,7 @@ class Grid(object):
             if message.control == 96: # note
                 self.focus(self.note_picker)
             if message.control == 97: # device
-                self.focus(self.instrument_picker)
+                self.focus(self.combo_picker)
             if message.control == 98: # user
                 self.focus(self.color_picker)
             # FIXME: add button messages
@@ -100,6 +108,27 @@ class Layout(object):
 
     def synth(self, message):
         pass
+
+
+class ComboLayout(Layout):
+
+    def __init__(self, gridget_map):
+        self.gridget_map = gridget_map
+
+    def pad(self, row, column, velocity):
+        self.gridget_map[row, column].pad(row, column, velocity)
+
+    def show(self):
+        for gridget in set(self.gridget_map.values()):
+            gridget.synth = self.synth
+            gridget.led = self.led_by_gridget(gridget)
+            gridget.show()
+
+    def led_by_gridget(self, gridget):
+        def led(row, column, color):
+            if self.gridget_map[row, column] == gridget:
+                self.led(row, column, color)
+        return led
 
 
 class NotePicker(Layout):
