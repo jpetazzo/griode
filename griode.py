@@ -32,7 +32,7 @@ def open_port_matching(string, in_or_out, get_port_names, open_port):
             .format(in_or_out, string))
 
 fluidsynth = subprocess.Popen(
-        ["fluidsynth", "-a", "pulseaudio", "-p", "griode", "default.sf2"],
+        ["fluidsynth", "-a", "pulseaudio", "-r", "4", "-c", "4", "-p", "griode", "default.sf2"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
 
