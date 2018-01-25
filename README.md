@@ -53,6 +53,7 @@ Here are a few links to some SF2 files:
 - [GeneralUser](http://www.schristiancollins.com/generaluser.php)
 - [Fluid SoundFont](https://packages.debian.org/source/sid/fluid-soundfont)
 - [Soundfonts4U](https://sites.google.com/site/soundfonts4u/)
+- [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
 
 
 ## LaunchPad

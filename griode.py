@@ -32,7 +32,7 @@ def open_port_matching(string, in_or_out, get_port_names, open_port):
             .format(in_or_out, string))
 
 fluidsynth = subprocess.Popen(
-        ["fluidsynth", "-a", "pulseaudio", "-r", "4", "-c", "4", "-p", "griode", "default.sf2"],
+        ["fluidsynth", "-a", "pulseaudio", "-r", "8", "-c", "8", "-p", "griode", "default.sf2"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
 
@@ -68,8 +68,7 @@ class BeatClock(object):
 
     def __init__(self, callback):
         self.bpm = 120
-        self.beat = 0
-        self.frame = 0 # 24 "frames" or "ticks" per bet
+        self.tick = 0 # 24 ticks per quarter note
         self.next = time.time()
         self.callback = callback
 
@@ -77,11 +76,8 @@ class BeatClock(object):
         now = time.time()
         if now < self.next:
             return self.next - now
-        self.frame += 1
-        if self.frame == 24:
-            self.beat += 1
-            self.frame = 0
-        self.callback(self.beat, self.frame)
+        self.tick += 1
+        self.callback(self.tick)
         # Compute when we're due next
         self.next += 60.0 / self.bpm / 24
         if now > self.next:

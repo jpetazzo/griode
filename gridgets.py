@@ -32,6 +32,7 @@ class Grid(object):
         self.instrument_picker = InstrumentPicker()
         self.color_picker = ColorPicker()
         self.scale_picker = ScalePicker(self.note_picker)
+        self.arpeggiator = Arpeggiator(self.synth)
         combo_map = {}
         for row in range(1, 4):
             for column in range (1, 9):
@@ -46,7 +47,7 @@ class Grid(object):
     def focus(self, gridget):
         self.gridget = gridget
         self.gridget.led = self.led
-        self.gridget.synth = self.synth
+        self.gridget.synth = self.arpeggiator.synth
         self.gridget.show()
 
     def process_message(self, message):
@@ -80,8 +81,10 @@ class Grid(object):
             velocity = message.velocity
             self.gridget.pad(row, column, velocity)
 
-    def tick(self, beat, frame):
-        self.grid_out.send(mido.Message("control_change", control=98, value=colors.BLACK if frame>4 else colors.WHITE))
+    def tick(self, tick):
+        color = colors.WHITE if tick%24<4 else colors.BLACK
+        self.grid_out.send(mido.Message("control_change", control=98, value=color))
+        self.arpeggiator.tick(tick)
 
 
 class Layout(object):
@@ -382,4 +385,61 @@ note2piano = [
 
 piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
 
+class Arpeggiator(Layout):
+
+    def __init__(self, synth):
+        self.interval = 6 # 24 = quarter note, 12 = eight note, etc.
+        self.steps = [
+                (4, 3), (2, 3), (2, 2), (4, 2),
+                (2, 2), (3, 1), (3, 1), (3, 2)
+                ]
+        self.next_step = 0
+        self.last_tick = 0
+        self.next_tick = 0
+        self.multi_notes = [0, 12]
+        self.number_of_steps = len(self.steps)
+        self.notes = []
+        self.playing = []
+        self.real_synth = synth
+    
+    def tick(self, tick):
+        self.last_tick = tick
+        # OK, first, let's see if some notes have "expired" and should be stopped
+        for note,deadline in self.playing:
+            if tick > deadline:
+                self.real_synth(mido.Message("note_on", note=note, velocity=0))
+                self.playing.remove((note, deadline))
+        # Then, is it time to spell out the next note?
+        if tick < self.next_tick:
+            return
+        # OK, is there any note in the buffer?
+        if self.notes == []:
+            return
+        # Yay we have notes to play!
+        velocity, gate = self.steps[self.next_step]
+        velocity = velocity*31
+        duration = gate*2
+        self.real_synth(mido.Message("note_on", note=self.notes[0], velocity=velocity))
+        self.playing.append((self.notes[0], tick+duration))
+        self.notes = self.notes[1:] + [self.notes[0]]
+        self.next_tick += self.interval
+        self.next_step += 1
+        if self.next_step == self.number_of_steps:
+            self.next_step = 0
+
+    def synth(self, message):
+        if message.type == "note_on":
+            if message.velocity > 0:
+                if self.notes == []:
+                    self.next_tick = self.last_tick + 1
+                    self.next_step = 0
+                for i, offset in enumerate(self.multi_notes):
+                    insert_position = i + i*len(self.notes)//len(self.multi_notes)
+                    self.notes.insert(insert_position, message.note+offset)
+            else:
+                if message.note in self.notes:
+                    for offset in self.multi_notes:
+                        self.notes.remove(message.note+offset)
+        else:
+            self.real_synth(message)
 
