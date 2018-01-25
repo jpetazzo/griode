@@ -80,6 +80,10 @@ class Grid(object):
             velocity = message.velocity
             self.gridget.pad(row, column, velocity)
 
+    def tick(self, beat, frame):
+        self.grid_out.send(mido.Message("control_change", control=98, value=colors.BLACK if frame>4 else colors.WHITE))
+
+
 class Layout(object):
     """Base layout for gridgets."""
 
@@ -279,6 +283,7 @@ class ColorPicker(Layout):
     def pad(self, row, column, velocity):
         if velocity > 0:
             print("Color #{}".format((row-1)*8 + column-1))
+
 
 class ScalePicker(Layout):
     """

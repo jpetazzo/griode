@@ -63,5 +63,35 @@ grid = gridgets.Grid(
         grid_out=open_output_matching("MIDI 2"),
         synth_out=synth_port)
 
+
+class BeatClock(object):
+
+    def __init__(self, callback):
+        self.bpm = 120
+        self.beat = 0
+        self.frame = 0 # 24 "frames" or "ticks" per bet
+        self.next = time.time()
+        self.callback = callback
+
+    def loop(self):
+        now = time.time()
+        if now < self.next:
+            return self.next - now
+        self.frame += 1
+        if self.frame == 24:
+            self.beat += 1
+            self.frame = 0
+        self.callback(self.beat, self.frame)
+        # Compute when we're due next
+        self.next += 60.0 / self.bpm / 24
+        if now > self.next:
+            print("We're running late by {} seconds!".format(self.next-now))
+            return 0
+        return self.next - now
+
+
+beatclock = BeatClock(grid.tick)
+
 while True:
-    time.sleep(1)
+    time.sleep(beatclock.loop())
+
