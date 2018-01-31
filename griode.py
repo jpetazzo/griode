@@ -58,9 +58,14 @@ while synth_port is None:
         print("Could not connect to fluidsynth!")
         time.sleep(1)
 
+class DummyIO(object):
+
+    def send(self, message):
+        print(message)
+
 grid = gridgets.Grid(
-        grid_in=open_input_matching("MIDI 2"),
-        grid_out=open_output_matching("MIDI 2"),
+        grid_in=open_input_matching("MIDI 2") or DummyIO(),
+        grid_out=open_output_matching("MIDI 2") or DummyIO(),
         synth_out=synth_port)
 
 
