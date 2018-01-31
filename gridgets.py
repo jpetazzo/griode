@@ -241,7 +241,43 @@ class NotePicker(Layout):
         self.synth(mido.Message('note_on', note=note, velocity=velocity))
 
 
-class InstrumentPicker(Layout):
+class OnOffPicker(Layout):
+    """Helper class to build gridgets allowing to turn things on/off."""
+
+    def color(self, row, column, on_off):
+        """Return the color of the corresponding row/column/state."""
+
+    def lights_on(self):
+        """Return a list of (row,colum) pairs that should be lit."""
+
+    def switch(self, row, column):
+        """Called by the helper when a specific pad is pressed."""
+
+    def show(self):
+        for row in range(1, 9):
+            for column in range(1, 9):
+                self.led(row, column, self.color(row, column, False))
+        for r,c in self.lights_on():
+            self.led(r, c, self.color(r, c, True))
+
+    def pad(self, row, column, velocity):
+        # Only deal with "push" events (not "release")
+        if velocity==0:
+            return
+        # Get current LED state
+        old = self.lights_on()
+        # Dispatch event
+        self.switch()
+        # Get new LED state
+        new = self.lights_on()
+        # FIXME for now, deliberately turn everything off then on
+        for (r, c) in old:
+            self.led(r, c, self.color(r, c, False))
+        for (r, c) in new:
+            self.led(r, c, self.color(r, c, True))
+
+
+class InstrumentPicker(OnOffPicker):
 
     def __init__(self):
         self.font = 0       # Sound font index
@@ -269,26 +305,15 @@ class InstrumentPicker(Layout):
             return colors.CYAN_SKY
         return colors.BLACK
 
-    def rowcols(self):
+    def lights_on(self):
         # Which leds are supposed to be ON for the current instrument
         return [(8, 1+self.font),
                 (7-(self.group//8), 1+self.group%8),
                 (5, 1+self.instrument),
                 (4, 1+self.bank)]
 
-    def show(self):
-        for row in range(1, 9):
-            for column in range(1, 9):
-                self.led(row, column, self.color(row, column, False))
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, True))
 
-    def pad(self, row, col, velocity):
-        if velocity == 0:
-            return
-        # Turn off leds for current instrument
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, False))
+    def switch(self, row, col):
         if row==8: # FIXME font
             pass
         if row==7:
@@ -301,9 +326,6 @@ class InstrumentPicker(Layout):
             pass
         # Switch to new instrument
         self.change()
-        # Turn on corresponding leds
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, True))
 
 
 class ColorPicker(Layout):
@@ -319,7 +341,7 @@ class ColorPicker(Layout):
             print("Color #{}".format((row-1)*8 + column-1))
 
 
-class ScalePicker(Layout):
+class ScalePicker(OnOffPicker):
     """
     ##.###.. # of the key below
     CDEFGAB. pick key
@@ -353,7 +375,8 @@ class ScalePicker(Layout):
                 pass
         return colors.BLACK
 
-    def rowcols(self): # return row,col that should be ON
+    def lights_on(self):
+        # return row,col that should be ON
         lights = []
 
         key = self.note_picker.key
@@ -373,13 +396,7 @@ class ScalePicker(Layout):
 
         return lights
 
-    def pad(self, row, column, velocity):
-        if velocity == 0:
-            return
-        # Turn off leds for current scale etc.
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, False))
-
+    def switch(self, row, column):
         # Change the key in which we're playing
         if row in [7, 8]:
             note = piano2note.get((row-6, column))
@@ -394,17 +411,6 @@ class ScalePicker(Layout):
             except IndexError:
                 pass
 
-        # Turn on corresponding leds
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, True))
-
-
-    def show(self):
-        for row in range(1, 9):
-            for column in range(1, 9):
-                self.led(row, column, self.color(row, column, False))
-        for r,c in self.rowcols():
-            self.led(r, c, self.color(r, c, True))
 
 # Maps notes to a pseudo-piano layout
 # (with black keys on the top row and white keys on the bottom row)
@@ -432,7 +438,7 @@ class Arpeggiator(Layout):
         self.notes = []
         self.playing = []
         self.real_synth = synth
-    
+
     def tick(self, tick):
         self.last_tick = tick
         # OK, first, let's see if some notes have "expired" and should be stopped
