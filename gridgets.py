@@ -91,10 +91,19 @@ class Layout(object):
     """Base layout for gridgets."""
 
     def pad(self, row, column, velocity):
-        pass
+        """"This method gets called when a pad is pressed or released.
+
+        Row and column start at 1, where (1,1) is the lower left corner.
+        Most of the code in griode assumes that the input grid is 8x8.
+        The velocity is the pressure. This is a MIDI value, meaning that
+        it ranges from 0 to 127. 0 means that the pad was actually
+        released (this is part of the MIDI standard: a "NOTE ON"
+        event with a velocity of 0 is like a "NOTE OFF" event).
+        """
 
     def button(self, number):
-        pass
+        """This method gets called when a side button is pressed."""
+
 
     def left(self):
         pass
@@ -109,13 +118,35 @@ class Layout(object):
         pass
 
     def show(self):
-        pass
+        """When this method is called, the gridget must draw itself."""
+
+    def tick(self, tick):
+        """This is called every tick to let the gridget track time.
+
+        The gridget doesn't have to implement this method; but it can
+        do it to keep track of elapsed time. This method will be called
+        every tick (per MIDI standard, there are 24 ticks per quarter
+        note). The argument is an absolute tick number. If the gridget
+        needs a better accuracy (while handling a button or pad press,
+        for instance) it can call time.time() as well.
+        """
 
     def led(self, row, column, color):
-        pass
+        """The gridget should call this method to light up the grid.
+
+        This method will be provided by the container of the gridget.
+        Rows and columns start at 1. Color is a constant from the
+        `colors` module, e.g. colors.BLACK.
+        """
 
     def synth(self, message):
-        pass
+        """The gridget should call this method to play sounds.
+
+        This method will be provided by the container of the gridget.
+        The message should be a MIDI message constructed with the
+        mido package, e.g.:
+        `mido.Message("note_on", note=64, velocity=64)`
+        """
 
 
 class ComboLayout(Layout):
