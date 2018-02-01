@@ -81,8 +81,9 @@ synth_port = None
 while synth_port is None:
     synth_port = open_output_matching("griode")
     if synth_port is None:
-        print("Could not connect to fluidsynth!")
+        logging.info("Could not connect to fluidsynth, retrying...")
         time.sleep(1)
+logging.info("Connected to fluidsynth.")
 
 class DummyIO(object):
 
