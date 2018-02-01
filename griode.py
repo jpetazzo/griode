@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import logging
 import mido
 import subprocess
 import sys
@@ -36,9 +37,35 @@ fluidsynth = subprocess.Popen(
         stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
 
-programs = {}
+class Instruments(object):
+
+    def __init__(self):
+        self.fonts = []
+
+    def add_font(self, number, name):
+        self.melodic = (number, name, {})
+        self.drumkits = (number, name, {})
+
+    def add(self, program, bank, name):
+        if bank<100:
+            category = self.melodic
+        else:
+            category = self.drumkits
+        # We only want non-empty fonts, so we only add a font to the top-level list
+        # when we add the first instrument in that font
+        if category not in self.fonts:
+            self.fonts.append(category)
+        # OK now do we already have that program?
+        programs = category[2]
+        if program not in programs:
+            programs[program] = {}
+        # Add the specific variation (bank in MIDI parlance) to that program
+        programs[program][bank] = name
+
+instruments = Instruments()
 while fluidsynth.stdout.peek() != b"> ":
     fluidsynth.stdout.readline()
+instruments.add_font(1, "default")
 fluidsynth.stdin.write(b"inst 1\n")
 fluidsynth.stdin.flush()
 fluidsynth.stdout.readline()
@@ -46,10 +73,9 @@ while fluidsynth.stdout.peek() != b"> ":
     line = fluidsynth.stdout.readline()
     bank_prog, program_name = line.split(b" ", 1)
     bank, prog = [int(x) for x in bank_prog.split(b"-")]
-    print("{} -> {} -> {}".format(prog, bank, program_name))
-    if prog not in programs:
-        programs[prog] = {}
-    programs[prog][bank] = program_name
+    name = program_name.decode("ascii").strip()
+    logging.debug("Adding instrument {} -> {} -> {}".format(prog, bank, name))
+    instruments.add(prog, bank, name)
 
 synth_port = None
 while synth_port is None:
