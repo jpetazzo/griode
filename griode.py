@@ -1,11 +1,15 @@
 #!/usr/bin/env python
 import logging
+import os
 import mido
 import subprocess
 import sys
 import time
 
 import gridgets
+
+
+logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 
 def open_input_matching(string):
@@ -37,35 +41,27 @@ fluidsynth = subprocess.Popen(
         stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
 
-class Instruments(object):
 
-    def __init__(self):
-        self.fonts = []
+class Instrument(object):
 
-    def add_font(self, number, name):
-        self.melodic = (number, name, {})
-        self.drumkits = (number, name, {})
+    def __init__(self, font, program, bank, name):
+        self.font = font        # fluidsynth font number (starts at 1)
+        self.program = program  # MIDI program number [0..127]
+        self.bank = bank        # bank [0..127] I think
+        self.name = name        # string (not guaranteed to be unique!)
 
-    def add(self, program, bank, name):
-        if bank<100:
-            category = self.melodic
-        else:
-            category = self.drumkits
-        # We only want non-empty fonts, so we only add a font to the top-level list
-        # when we add the first instrument in that font
-        if category not in self.fonts:
-            self.fonts.append(category)
-        # OK now do we already have that program?
-        programs = category[2]
-        if program not in programs:
-            programs[program] = {}
-        # Add the specific variation (bank in MIDI parlance) to that program
-        programs[program][bank] = name
+    def messages(self):
+        """Generate MIDI messages to switch to that instrument."""
+        # FIXME: deal with font
+        return [
+                mido.Message("control_change", control=0, value=self.bank),
+                mido.Message("program_change", program=self.program),
+                ]
 
-instruments = Instruments()
+
+instruments = []
 while fluidsynth.stdout.peek() != b"> ":
     fluidsynth.stdout.readline()
-instruments.add_font(1, "default")
 fluidsynth.stdin.write(b"inst 1\n")
 fluidsynth.stdin.flush()
 fluidsynth.stdout.readline()
@@ -75,7 +71,7 @@ while fluidsynth.stdout.peek() != b"> ":
     bank, prog = [int(x) for x in bank_prog.split(b"-")]
     name = program_name.decode("ascii").strip()
     logging.debug("Adding instrument {} -> {} -> {}".format(prog, bank, name))
-    instruments.add(prog, bank, name)
+    instruments.append(Instrument(1, prog, bank, name))
 
 synth_port = None
 while synth_port is None:
@@ -93,7 +89,9 @@ class DummyIO(object):
 grid = gridgets.Grid(
         grid_in=open_input_matching("MIDI 2") or DummyIO(),
         grid_out=open_output_matching("MIDI 2") or DummyIO(),
-        synth_out=synth_port)
+        synth_out=synth_port,
+        instruments=instruments,
+        )
 
 
 class BeatClock(object):
