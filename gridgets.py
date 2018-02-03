@@ -41,6 +41,8 @@ class Grid(object):
             for column in range (1, 9):
                 combo_map[row, column] = self.instrument_picker
         self.combo_picker = ComboLayout(combo_map)
+        # This SysEx message switches the LaunchPad Pro to "programmer" mode
+        self.grid_out.send(mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]))
         self.focus(self.note_picker)
         self.grid_in.callback = self.process_message
 
