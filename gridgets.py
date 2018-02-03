@@ -559,7 +559,7 @@ class Arpeggiator(Layout):
         self.notes = self.notes[1:] + [self.notes[0]]
         self.next_tick += self.interval
         self.next_step += 1
-        if self.next_step == self.number_of_steps:
+        if self.next_step >= self.number_of_steps:
             self.next_step = 0
 
     def synth(self, message):
