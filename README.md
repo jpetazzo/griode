@@ -55,6 +55,14 @@ Here are a few links to some SF2 files:
 - [Soundfonts4U](https://sites.google.com/site/soundfonts4u/)
 - [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
 
+### Usage
+
+After installing the dependencies as described above and ensuring your Launchpad
+is plugged into your machine, run `./griode.py`.
+
+#### Debugging
+
+Set `LOG_LEVEL` environment variable to `DEBUG` for verbose output.
 
 ## LaunchPad
 
