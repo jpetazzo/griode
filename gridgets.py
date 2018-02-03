@@ -75,7 +75,8 @@ class Grid(object):
             if message.control == 97: # device
                 self.focus(self.combo_picker)
             if message.control == 98: # user
-                self.focus(self.color_picker)
+                #self.focus(self.color_picker)
+                self.focus(self.arpeggiator)
             # FIXME: add button messages
 
         if message.type == "note_on":
@@ -488,8 +489,8 @@ class Arpeggiator(Layout):
     def __init__(self, synth):
         self.interval = 6 # 24 = quarter note, 12 = eight note, etc.
         self.steps = [
-                (4, 3), (2, 3), (2, 2), (4, 2),
-                (2, 2), (3, 1), (3, 1), (3, 2)
+                [4, 3], [2, 3], [2, 2], [4, 2],
+                [1, 2], [3, 1], [3, 1], [3, 2]
                 ]
         self.next_step = 0
         self.last_tick = 0
@@ -499,6 +500,42 @@ class Arpeggiator(Layout):
         self.notes = []
         self.playing = []
         self.real_synth = synth
+
+    def color(self, row, column):
+        if column > self.number_of_steps:
+            if row == 1:
+                return colors.GREEN_LO
+            else:
+                return colors.BLACK
+        velocity, gate = self.steps[column-1]
+        if row == 1:
+            return colors.GREEN_HI
+        if row in [2, 3, 4]:
+            if gate > row-2:
+                return colors.SPRING
+        if row in [5, 6, 7, 8]:
+            if velocity > row-5:
+                return colors.LIME
+        return colors.BLACK
+
+    def show(self):
+        for row in range(1, 9):
+            for column in range(1, 9):
+                self.led(row, column, self.color(row, column))
+
+    def pad(self, row, column, velocity):
+        if velocity == 0:
+            return
+        if row == 1:
+            self.number_of_steps = column
+            while len(self.steps) < self.number_of_steps:
+                self.steps.append([1,1])
+        if row in [2, 3, 4]:
+            self.steps[column-1][1] = row-1
+        if row in [5, 6, 7, 8]:
+            self.steps[column-1][0] = row-4
+        self.show()
+        # FIXME: redraw only what's necessary
 
     def tick(self, tick):
         self.last_tick = tick
