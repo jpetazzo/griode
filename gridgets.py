@@ -18,7 +18,7 @@ def persist_fields(**kwargs):
         #FIXME this will be a singleton for now
         filename = "{}.sav".format(klass.__name__)
         logging.debug("Opening shelf {}".format(filename))
-        klass.db = shelve.open(filename)
+        klass.db = shelve.open(filename, writeback=True)
         for attr_name, default_value in kwargs.items():
             def getter(self, attr_name=attr_name):
                 logging.debug("Getting {}/{}".format(filename, attr_name))
@@ -33,7 +33,9 @@ def persist_fields(**kwargs):
                     "Initializing {}/{} with default value {}"
                     .format(filename, attr_name, default_value))
                 klass.db[attr_name] =  default_value
-            logging.debug("Patching field {}.{} with {} and {}".format(klass, attr_name, getter, setter))
+            logging.debug(
+                    "Patching field {}.{} with {} and {}"
+                    .format(klass, attr_name, getter, setter))
             setattr(klass, attr_name, property(getter, setter))
         return klass
     return wrap_class
@@ -203,13 +205,8 @@ class ComboLayout(Layout):
         return led
 
 
+@persist_fields(key=notes.C, scale=scales.MAJOR, shift=5, root=48+notes.C)
 class NotePicker(Layout):
-
-    def __init__(self, key=notes.C, scale=scales.MAJOR, shift=5):
-        self.key = key
-        self.scale = scale
-        self.shift = shift
-        self.root = key+48 # root is the lowest note (bottom-left corner)
 
     def rowcol2note(self, row, column):
         note = self.root + (column-1) + self.shift*(row-1)
@@ -515,19 +512,18 @@ note2piano = [
 
 piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
 
+@persist_fields(
+        interval=6, # 24 = quarter note, 12 = eigth note, etc.
+        steps = [[4, 3], [1, 2], [3, 1], [1, 2]],
+        number_of_steps=4,
+        )
 class Arpeggiator(Layout):
 
     def __init__(self, synth):
-        self.interval = 6 # 24 = quarter note, 12 = eight note, etc.
-        self.steps = [
-                [4, 3], [2, 3], [2, 2], [4, 2],
-                [1, 2], [3, 1], [3, 1], [3, 2]
-                ]
         self.next_step = 0
         self.last_tick = 0
         self.next_tick = 0
         self.multi_notes = [0, 12]
-        self.number_of_steps = len(self.steps)
         self.notes = []
         self.playing = []
         self.real_synth = synth
