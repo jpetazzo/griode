@@ -6,11 +6,9 @@ import subprocess
 import sys
 import time
 
-import gridgets
-
-
 logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
+import gridgets
 
 def open_input_matching(string):
     return open_port_matching(

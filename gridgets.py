@@ -4,6 +4,7 @@ import mido
 import colors
 import notes
 import scales
+import shelve
 
 
 color_key = colors.GREEN_HI
@@ -11,6 +12,32 @@ color_scale = colors.WHITE
 color_other = colors.BLACK
 color_played = colors.RED
 
+
+def persist_fields(**kwargs):
+    def wrap_class(klass):
+        #FIXME this will be a singleton for now
+        filename = "{}.sav".format(klass.__name__)
+        logging.debug("Opening shelf {}".format(filename))
+        klass.db = shelve.open(filename)
+        for attr_name, default_value in kwargs.items():
+            def getter(self, attr_name=attr_name):
+                logging.debug("Getting {}/{}".format(filename, attr_name))
+                return klass.db[attr_name]
+            def setter(self, value, attr_name=attr_name):
+                logging.debug(
+                        "Setting {}/{} to {}"
+                        .format(filename, attr_name, value))
+                klass.db[attr_name] = value
+            if attr_name not in klass.db:
+                logging.debug(
+                    "Initializing {}/{} with default value {}"
+                    .format(filename, attr_name, default_value))
+                klass.db[attr_name] =  default_value
+            logging.debug("Patching field {}.{} with {} and {}".format(klass, attr_name, getter, setter))
+            setattr(klass, attr_name, property(getter, setter))
+        return klass
+    return wrap_class
+    
 
 class Grid(object):
     """Represents an I/O surface like a LaunchPad or Monome."""
@@ -30,6 +57,9 @@ class Grid(object):
         self.gridget = None
         self.note_picker = NotePicker()
         self.instrument_picker = InstrumentPicker(instruments)
+        # FIXME refactor this somehow
+        self.instrument_picker.synth=self.synth
+        self.instrument_picker.change()
         self.color_picker = ColorPicker()
         self.scale_picker = ScalePicker(self.note_picker)
         self.arpeggiator = Arpeggiator(self.synth)
@@ -295,6 +325,7 @@ def classify(list_of_things, get_key):
     return dict_of_things
 
 
+@persist_fields(font=0, group=0, instrument=0, variation=0)
 class InstrumentPicker(OnOffPicker):
 
     def __init__(self, instruments):
@@ -327,10 +358,10 @@ class InstrumentPicker(OnOffPicker):
         # self.fonts[0..N] = (("X_melodrum", font_num), font)
         # then in a font you have: font[0..15][0..7] = list of (bank, instrument)
 
-        self.font = 0       # Index in self.fonts (unrelated to ifluidsynth)
-        self.group = 0      # General Midi group (0=piano, 1=chroma perc...)
-        self.instrument = 0 # Instrument in group (0 to 7)
-        self.variation = 0  # Instrument variation
+        #self.font = 0       # Index in self.fonts (unrelated to ifluidsynth)
+        #self.group = 0      # General Midi group (0=piano, 1=chroma perc...)
+        #self.instrument = 0 # Instrument in group (0 to 7)
+        #self.variation = 0  # Instrument variation
 
     def change(self):
         # Send the relevant program change message
