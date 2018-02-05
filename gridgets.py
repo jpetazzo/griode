@@ -7,6 +7,17 @@ import scales
 import shelve
 
 
+channel_colors = [
+        colors.RED_HI,
+        colors.AMBER_HI,
+        colors.YELLOW_HI,
+        colors.GREEN_HI,
+        colors.SKY_HI,
+        colors.BLUE_HI,
+        colors.ORCHID_HI,
+        colors.MAGENTA_HI,
+]
+
 color_key = colors.GREEN_HI
 color_scale = colors.WHITE
 color_other = colors.BLACK
@@ -45,8 +56,12 @@ class Grid(object):
     """Represents an I/O surface like a LaunchPad or Monome."""
 
     def led(self, row, column, color):
-        note = 10*row + column
-        message = mido.Message('note_on', note=note, velocity=color)
+        if (row,column) == (9,9):
+            # Special case for front/side LED
+            message = mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, color])
+        else:
+            note = 10*row + column
+            message = mido.Message('note_on', note=note, velocity=color)
         self.grid_out.send(message)
 
     def synth(self, message):
@@ -107,8 +122,9 @@ class Grid(object):
             if message.control == 97: # device
                 self.focus(self.combo_picker)
             if message.control == 98: # user
-                #self.focus(self.color_picker)
                 self.focus(self.arpeggiator)
+            if message.control == 10:
+                self.focus(self.color_picker)
             # FIXME: add button messages
 
         if message.type == "note_on":
