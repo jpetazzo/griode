@@ -508,6 +508,8 @@ class ScalePicker(OnOffPicker):
             note = piano2note.get((row-6, column))
             if note is not None:
                 self.note_picker.key = note
+                self.synth(mido.Message("note_on", note=64+note, velocity=127))
+                self.synth(mido.Message("note_on", note=64+note, velocity=0))
 
         # Pick a scale from the palette
         if row in [1, 2]:
