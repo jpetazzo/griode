@@ -8,89 +8,152 @@ import time
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
-import gridgets
-
-def open_input_matching(string):
-    return open_port_matching(
-            string,
-            "input",
-            mido.get_input_names,
-            mido.open_input)
-
-def open_output_matching(string):
-    return open_port_matching(
-            string,
-            "output",
-            mido.get_output_names,
-            mido.open_output)
-
-def open_port_matching(string, in_or_out, get_port_names, open_port):
-    port_names = get_port_names()
-    for port_name in port_names:
-        if string in port_name:
-            print("Using {} for {}.".format(port_name, in_or_out))
-            return open_port(port_name)
-
-    print("Could not find any {} port matching {}."
-            .format(in_or_out, string))
-
-fluidsynth = subprocess.Popen(
-        ["fluidsynth", "-a", "pulseaudio", "-r", "8", "-c", "8", "-p", "griode", "default.sf2"],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE
-        )
+import colors
+from fluidsynth import Fluidsynth
+from gridgets import ColorPicker, NotePicker
+import notes
+from persistence import persist_fields
+import scales
 
 
-class Instrument(object):
+@persist_fields(key=notes.C, scale=scales.MAJOR)
+class Griode(object):
 
-    def __init__(self, font, program, bank, name):
-        self.font = font        # fluidsynth font number (starts at 1)
-        self.program = program  # MIDI program number [0..127]
-        self.bank = bank        # bank [0..127] I think
-        self.name = name        # string (not guaranteed to be unique!)
+    def __init__(self):
+        self.synth = Fluidsynth()
+        #self.devicechains = [DeviceChain(self, i) for i in range(16)]
+        self.grids = []
+        for port_name in mido.get_ioport_names():
+            if "Launchpad Pro MIDI 2" in port_name:
+                self.grids.append(LaunchpadPro(self, port_name))
+            if "Launchpad MK2" in port_name:
+                self.grids.append(LaunchpadMK2(self, port_name))
 
-    def messages(self):
-        """Generate MIDI messages to switch to that instrument."""
-        # FIXME: deal with font
-        return [
-                mido.Message("control_change", control=0, value=self.bank),
-                mido.Message("program_change", program=self.program),
-                ]
+class LaunchPad(object):
+
+    def __init__(self, griode, port_name):
+        self.griode = griode
+        self.port_name = port_name
+        logging.info("Opening grid device {}".format(port_name))
+        self.grid_in = mido.open_input(port_name)
+        self.grid_out = mido.open_output(port_name)
+        for message in self.setup:
+            self.grid_out.send(message)
+        self.surface = LPSurface(self)
+        self.active_gridget = None # Gridget currently in the foreground
+        self.colorpicker = ColorPicker(self)
+        self.notepickers = [NotePicker(self, i) for i in range(16)]
+        self.grid_in.callback = self.process_message
+        self.focus(self.notepickers[0])
+
+    def focus(self, gridget):
+        self.active_gridget = gridget
+        # For now, allow the gridget to draw directly on us (FIXME later)
+        gridget.surface.parent = self.surface
+        # Now draw the gridget on us
+        for led in gridget.surface:
+            self.surface[led] = gridget.surface[led]
+
+    def process_message(self, message):
+        logging.debug("{} got message {}".format(self, message))
+
+        # If there is no active gridget, ignore the message
+        if self.active_gridget is None:
+            return
+
+        # Ignore aftertouch messages for now
+        if message.type == "polytouch":
+            return
+
+        # Let's try to find out if the performer pressed a pad/button
+        led = None
+        velocity = None
+        if message.type == "note_on":
+            led = self.message2led.get(("NOTE", message.note))
+            velocity = message.velocity
+        elif message.type == "control_change":
+            led = self.message2led.get(("CC", message.control))
+
+        if led is None:
+            logging.warning("Unhandled message: {}".format(message))
+
+        if isinstance(led, tuple):
+            row, column = led
+            self.active_gridget.pad_pressed(row, column, velocity)
+        elif isinstance(led, str):
+            # Only emit button_pressed when the button is pressed
+            # (i.e. not when it is released, which corresponds to value=0)
+            if message.value == 127:
+                self.active_gridget.button_pressed(led)
 
 
-instruments = []
-while fluidsynth.stdout.peek() != b"> ":
-    fluidsynth.stdout.readline()
-fluidsynth.stdin.write(b"inst 1\n")
-fluidsynth.stdin.flush()
-fluidsynth.stdout.readline()
-while fluidsynth.stdout.peek() != b"> ":
-    line = fluidsynth.stdout.readline()
-    bank_prog, program_name = line.split(b" ", 1)
-    bank, prog = [int(x) for x in bank_prog.split(b"-")]
-    name = program_name.decode("ascii").strip()
-    logging.debug("Adding instrument {} -> {} -> {}".format(prog, bank, name))
-    instruments.append(Instrument(1, prog, bank, name))
+class LPSurface(object):
 
-synth_port = None
-while synth_port is None:
-    synth_port = open_output_matching("griode")
-    if synth_port is None:
-        logging.info("Could not connect to fluidsynth, retrying...")
+    def __init__(self, launchpad):
+        self.launchpad = launchpad
+
+    def __iter__(self):
+        return self.launchpad.led2message.__iter__()
+
+    def __setitem__(self, led, color):
+        message_type, parameter = self.launchpad.led2message[led]
+        if message_type == "NOTE":
+            message = mido.Message("note_on", note=parameter, velocity=color)
+        elif message_type == "CC":
+            message = mido.Message("control_change", control=parameter, value=color)
+        self.launchpad.grid_out.send(message)
+
+
+class LaunchpadPro(LaunchPad):
+
+    message2led = {}
+    led2message = {}
+    for row in range(1,9):
+        for column in range(1,9):
+            note = 10*row + column
+            message2led["NOTE", note] = row, column
+            led2message[row, column] = "NOTE", note
+    for i,button in enumerate("UP DOWN LEFT RIGHT BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()):
+        control = 91 + i
+        message2led["CC", control] = button
+        led2message[button] = "CC", control
+
+    setup = [
+        # This SysEx message switches the LaunchPad Pro to "programmer" mode
+        mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]),
+        # And this one sets the front/side LED
+        mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, colors.WHITE]),
+        ]
+
+
+class LaunchpadMK2(LaunchPad):
+
+    message2led = {}
+    led2message = {}
+
+    for row in range(1,9):
+        for column in range(1,9):
+            note = 10*row + column
+            message2led["NOTE", note] = row, column
+            led2message[row, column] = "NOTE", note
+    for i,button in enumerate("UP DOWN LEFT RIGHT BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()):
+        control = 104 + i
+        message2led["CC", control] = button
+        led2message[button] = "CC", control
+
+    setup = []
+
+
+def main():
+    griode = Griode()
+    while True:
         time.sleep(1)
-logging.info("Connected to fluidsynth.")
 
-class DummyIO(object):
 
-    def send(self, message):
-        print(message)
+if __name__ == "__main__":
+    main()
 
-grid = gridgets.Grid(
-        grid_in=open_input_matching("MIDI 2") or DummyIO(),
-        grid_out=open_output_matching("MIDI 2") or DummyIO(),
-        synth_out=synth_port,
-        instruments=instruments,
-        )
-
+##############################################################################
 
 class BeatClock(object):
 
@@ -112,10 +175,4 @@ class BeatClock(object):
             print("We're running late by {} seconds!".format(self.next-now))
             return 0
         return self.next - now
-
-
-beatclock = BeatClock(grid.tick)
-
-while True:
-    time.sleep(beatclock.loop())
 

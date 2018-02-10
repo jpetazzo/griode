@@ -3,10 +3,15 @@ import mido
 
 import colors
 import notes
+from persistence import persist_fields
 import scales
 import shelve
 
+##############################################################################
 
+# And first, a few constants
+
+# That one is not used yet, but I'm saving this color scheme for later
 channel_colors = [
         colors.RED_HI,
         colors.AMBER_HI,
@@ -18,211 +23,89 @@ channel_colors = [
         colors.MAGENTA_HI,
 ]
 
-color_key = colors.GREEN_HI
-color_scale = colors.WHITE
-color_other = colors.BLACK
-color_played = colors.RED
+# This is used by the NotePicker, but should eventually disappear
+color_key      = colors.GREEN_HI
+color_scale    = colors.WHITE
+color_other    = colors.BLACK
+color_physical = colors.RED
+color_musical  = colors.AMBER
 
+##############################################################################
 
-def persist_fields(**kwargs):
-    def wrap_class(klass):
-        #FIXME this will be a singleton for now
-        filename = "{}.sav".format(klass.__name__)
-        logging.debug("Opening shelf {}".format(filename))
-        klass.db = shelve.open(filename, writeback=True)
-        for attr_name, default_value in kwargs.items():
-            def getter(self, attr_name=attr_name):
-                logging.debug("Getting {}/{}".format(filename, attr_name))
-                return klass.db[attr_name]
-            def setter(self, value, attr_name=attr_name):
-                logging.debug(
-                        "Setting {}/{} to {}"
-                        .format(filename, attr_name, value))
-                klass.db[attr_name] = value
-            if attr_name not in klass.db:
-                logging.debug(
-                    "Initializing {}/{} with default value {}"
-                    .format(filename, attr_name, default_value))
-                klass.db[attr_name] =  default_value
-            logging.debug(
-                    "Patching field {}.{} with {} and {}"
-                    .format(klass, attr_name, getter, setter))
-            setattr(klass, attr_name, property(getter, setter))
-        return klass
-    return wrap_class
-    
+class Surface(object):
 
-class Grid(object):
-    """Represents an I/O surface like a LaunchPad or Monome."""
+    def __init__(self, parent):
+        # Initialize our "framebuffer"
+        self.leds = {}
+        for led in parent:
+            self.leds[led] = colors.BLACK
+        # But don't display ourself on the parent yet
+        self.parent = None
 
-    def led(self, row, column, color):
-        if (row,column) == (9,9):
-            # Special case for front/side LED
-            message = mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, color])
+    def __iter__(self):
+        return self.leds.__iter__()
+
+    def __getitem__(self, led):
+        return self.leds[led]
+
+    def __setitem__(self, led, color):
+        if led not in self.leds:
+            logging.error("LED {} does not exist!".format(led))
         else:
-            note = 10*row + column
-            message = mido.Message('note_on', note=note, velocity=color)
-        self.grid_out.send(message)
+            current_color = self.leds[led]
+            if color != current_color:
+                self.leds[led] = color
+                if self.parent:
+                    self.parent[led] = color
 
-    def synth(self, message):
-        self.synth_out.send(message)
+##############################################################################
 
-    def __init__(self, grid_in, grid_out, synth_out, instruments):
-        self.grid_in = grid_in
-        self.grid_out = grid_out
-        self.synth_out = synth_out
-        self.gridget = None
-        self.note_picker = NotePicker()
-        self.instrument_picker = InstrumentPicker(instruments)
-        # FIXME refactor this somehow
-        self.instrument_picker.synth=self.synth
-        self.instrument_picker.change()
-        self.color_picker = ColorPicker()
-        self.scale_picker = ScalePicker(self.note_picker)
-        self.arpeggiator = Arpeggiator(self.synth)
-        combo_map = {}
-        for row in range(1, 4):
-            for column in range (1, 9):
-                combo_map[row, column] = self.note_picker
-        for row in range(4, 9):
-            for column in range (1, 9):
-                combo_map[row, column] = self.instrument_picker
-        self.combo_picker = ComboLayout(combo_map)
-        # This SysEx message switches the LaunchPad Pro to "programmer" mode
-        self.grid_out.send(mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]))
-        self.focus(self.note_picker)
-        self.grid_in.callback = self.process_message
+class Gridget(object):
 
-    def focus(self, gridget):
-        self.gridget = gridget
-        self.gridget.led = self.led
-        self.gridget.synth = self.arpeggiator.synth
-        self.gridget.show()
-
-    def process_message(self, message):
-
-        logging.debug(message)
-
-        if message.type == "polytouch":
-            return
-
-        if message.type == "control_change" and message.value == 127:
-            if message.control == 91:
-                self.gridget.up()
-            if message.control == 92:
-                self.gridget.down()
-            if message.control == 93:
-                self.gridget.left()
-            if message.control == 94:
-                self.gridget.right()
-            if message.control == 95: # session
-                self.focus(self.scale_picker)
-            if message.control == 96: # note
-                self.focus(self.note_picker)
-            if message.control == 97: # device
-                self.focus(self.combo_picker)
-            if message.control == 98: # user
-                self.focus(self.arpeggiator)
-            if message.control == 10:
-                self.focus(self.color_picker)
-            # FIXME: add button messages
-
-        if message.type == "note_on":
-            row, column = message.note//10, message.note%10
-            velocity = message.velocity
-            self.gridget.pad(row, column, velocity)
-
-    def tick(self, tick):
-        color = colors.WHITE if tick%24<4 else colors.BLACK
-        self.grid_out.send(mido.Message("control_change", control=98, value=color))
-        self.arpeggiator.tick(tick)
-
-
-class Layout(object):
-    """Base layout for gridgets."""
-
-    def pad(self, row, column, velocity):
-        """"This method gets called when a pad is pressed or released.
-
-        Row and column start at 1, where (1,1) is the lower left corner.
-        Most of the code in griode assumes that the input grid is 8x8.
-        The velocity is the pressure. This is a MIDI value, meaning that
-        it ranges from 0 to 127. 0 means that the pad was actually
-        released (this is part of the MIDI standard: a "NOTE ON"
-        event with a velocity of 0 is like a "NOTE OFF" event).
-        """
-
-    def button(self, number):
-        """This method gets called when a side button is pressed."""
-
-
-    def left(self):
+    def pad_pressed(self, row, column, velocity):
         pass
 
-    def right(self):
+    def button_pressed(self, button):
         pass
 
-    def up(self):
-        pass
+##############################################################################
 
-    def down(self):
-        pass
+class ColorPicker(Gridget):
 
-    def show(self):
-        """When this method is called, the gridget must draw itself."""
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                color = (row-1)*8 + column-1
+                self.surface[led] = color
 
-    def tick(self, tick):
-        """This is called every tick to let the gridget track time.
+    def pad_pressed(self, row, column, velocity):
+        if velocity > 0:
+            color = (row-1)*8 + column-1
+            print("Color #{} ({})".format(color, colors.by_number[color]))
 
-        The gridget doesn't have to implement this method; but it can
-        do it to keep track of elapsed time. This method will be called
-        every tick (per MIDI standard, there are 24 ticks per quarter
-        note). The argument is an absolute tick number. If the gridget
-        needs a better accuracy (while handling a button or pad press,
-        for instance) it can call time.time() as well.
-        """
+##############################################################################
 
-    def led(self, row, column, color):
-        """The gridget should call this method to light up the grid.
+class NotePicker(Gridget):
 
-        This method will be provided by the container of the gridget.
-        Rows and columns start at 1. Color is a constant from the
-        `colors` module, e.g. colors.BLACK.
-        """
+    def __init__(self, grid, channel):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.surface["BUTTON_2"] = colors.WHITE
+        self.channel = 0
+        self.shift = 5
+        self.root = 48
+        self.redraw()
 
-    def synth(self, message):
-        """The gridget should call this method to play sounds.
+    @property
+    def key(self):
+        return self.grid.griode.key
 
-        This method will be provided by the container of the gridget.
-        The message should be a MIDI message constructed with the
-        mido package, e.g.:
-        `mido.Message("note_on", note=64, velocity=64)`
-        """
-
-
-class ComboLayout(Layout):
-
-    def __init__(self, gridget_map):
-        self.gridget_map = gridget_map
-
-    def pad(self, row, column, velocity):
-        self.gridget_map[row, column].pad(row, column, velocity)
-
-    def show(self):
-        for gridget in set(self.gridget_map.values()):
-            gridget.synth = self.synth
-            gridget.led = self.led_by_gridget(gridget)
-            gridget.show()
-
-    def led_by_gridget(self, gridget):
-        def led(row, column, color):
-            if self.gridget_map[row, column] == gridget:
-                self.led(row, column, color)
-        return led
-
-
-@persist_fields(key=notes.C, scale=scales.MAJOR, shift=5, root=48+notes.C)
-class NotePicker(Layout):
+    @property
+    def scale(self):
+        return self.grid.griode.scale
 
     def rowcol2note(self, row, column):
         note = self.root + (column-1) + self.shift*(row-1)
@@ -254,40 +137,87 @@ class NotePicker(Layout):
             return color_scale
         return color_other
 
-    def show(self):
-        for row in range (1, 9):
-            for column in range (1, 9):
+    def redraw(self):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
                 note = self.rowcol2note(row, column)
                 color = self.note2color(note)
-                self.led(row, column, color)
+                self.surface[led] = color
 
-    def up(self):
-        self.root += 12
+    def button_pressed(self, button):
+        if button == "UP":
+            self.root += 12
+        elif button == "DOWN":
+            self.root -= 12
+        elif button == "LEFT":
+            self.root -= 1
+            self.redraw()
+        elif button == "RIGHT":
+            self.root += 1
+            self.redraw()
+        elif button == "BUTTON_1":
+            pass #self.parent.focus("ScalePicker")
+        elif button == "BUTTON_2":
+            pass #FIXME we're already in NotePicker so hum... configure it maybe
+        elif button == "BUTTON_3":
+            pass #self.parent.focus("InstrumentPicker")
+        elif button == "BUTTON_4":
+            pass #self.parent.focus("ArpSetup")
 
-    def down(self):
-        self.root -= 12
-
-    def left(self):
-        self.root -= 1
-        self.show()
-
-    def right(self):
-        self.root += 1
-        self.show()
-
-    def pad(self, row, column, velocity):
+    def pad_pressed(self, row, column, velocity):
         note = self.rowcol2note(row, column)
+        # Velocity curve (this is kind of a hack for now)
+        # FIXME this probably should be moved to the devicechains
         if velocity > 0:
             velocity = 63 + velocity//2
-            color = colors.RED
-        else:
-            color = self.note2color(note)
-        for row,column in self.note2rowcols(note):
-            self.led(row, column, color)
-        self.synth(mido.Message('note_on', note=note, velocity=velocity))
+        # Now play that note!
+        message = mido.Message("note_on", note=note, velocity=velocity)
+        self.grid.griode.synth.send(message)
+        # Then light up all instrumentpickers
+        for grid in self.grid.griode.grids:
+            picker = grid.notepickers[self.channel]
+            picker.send(message, self)
+    
+    def send(self, message, source_object):
+        if message.type == "note_on":
+            if message.velocity == 0:
+                color = self.note2color(message.note)
+            elif source_object == self:
+                color = colors.RED
+            else:
+                color = colors.AMBER
+            leds = self.note2rowcols(message.note)
+            for led in leds:
+                self.surface[led] = color
 
 
-class OnOffPicker(Layout):
+##############################################################################
+
+
+class Combo(Gridget):
+
+    def __init__(self, gridget_map):
+        self.gridget_map = gridget_map
+
+    def pad(self, row, column, velocity):
+        self.gridget_map[row, column].pad(row, column, velocity)
+
+    def show(self):
+        for gridget in set(self.gridget_map.values()):
+            gridget.synth = self.synth
+            gridget.led = self.led_by_gridget(gridget)
+            gridget.show()
+
+    def led_by_gridget(self, gridget):
+        def led(row, column, color):
+            if self.gridget_map[row, column] == gridget:
+                self.led(row, column, color)
+        return led
+
+
+
+class OnOffPicker(Gridget):
     """Helper class to build gridgets allowing to turn things on/off."""
 
     def color(self, row, column, on_off):
@@ -434,18 +364,6 @@ class InstrumentPicker(OnOffPicker):
         self.change()
 
 
-class ColorPicker(Layout):
-
-    def show(self):
-        for row in range(1, 9):
-            for col in range(1, 9):
-                color = (row-1)*8 + col-1
-                self.led(row, col, color)
-
-    def pad(self, row, column, velocity):
-        if velocity > 0:
-            print("Color #{}".format((row-1)*8 + column-1))
-
 
 class ScalePicker(OnOffPicker):
     """
@@ -527,6 +445,9 @@ note2piano = [
     ]
 
 piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
+
+class Layout(object):
+    pass
 
 @persist_fields(
         interval=6, # 24 = quarter note, 12 = eigth note, etc.
