@@ -10,7 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ColorPicker, InstrumentPicker, NotePicker
+from gridgets import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import notes
 from persistence import persist_fields
 import scales
@@ -44,6 +44,7 @@ class LaunchPad(object):
         self.colorpicker = ColorPicker(self)
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
+        self.scalepicker = ScalePicker(self)
         self.grid_in.callback = self.process_message
         self.focus(self.notepickers[0])
 

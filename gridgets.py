@@ -93,6 +93,7 @@ class NotePicker(Gridget):
     def __init__(self, grid, channel):
         self.grid = grid
         self.surface = Surface(grid.surface)
+        self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.WHITE
         self.surface["BUTTON_3"] = colors.GREY_LO
         self.channel = 0
@@ -158,7 +159,7 @@ class NotePicker(Gridget):
             self.root += 1
             self.redraw()
         elif button == "BUTTON_1":
-            pass #self.parent.focus("ScalePicker")
+            self.grid.focus(self.grid.scalepicker)
         elif button == "BUTTON_2":
             pass #FIXME we're already in NotePicker so hum... configure it maybe
         elif button == "BUTTON_3":
@@ -201,6 +202,7 @@ class InstrumentPicker(Gridget):
         self.channel = channel
         self.surface = Surface(grid.surface)
         self.background = Surface(grid.surface)
+        self.background["BUTTON_1"] = colors.GREY_LO
         self.background["BUTTON_2"] = colors.GREY_LO
         self.background["BUTTON_3"] = colors.WHITE
         self.draw()
@@ -294,142 +296,105 @@ class InstrumentPicker(Gridget):
         self.draw()
 
     def button_pressed(self, button):
+        if button == "BUTTON_1":
+            self.grid.focus(self.grid.scalepicker)
         if button == "BUTTON_2":
             self.grid.focus(self.grid.notepickers[self.channel])
 
 ##############################################################################
 
-
-class Combo(Gridget):
-
-    def __init__(self, gridget_map):
-        self.gridget_map = gridget_map
-
-    def pad(self, row, column, velocity):
-        self.gridget_map[row, column].pad(row, column, velocity)
-
-    def show(self):
-        for gridget in set(self.gridget_map.values()):
-            gridget.synth = self.synth
-            gridget.led = self.led_by_gridget(gridget)
-            gridget.show()
-
-    def led_by_gridget(self, gridget):
-        def led(row, column, color):
-            if self.gridget_map[row, column] == gridget:
-                self.led(row, column, color)
-        return led
-
-
-
-class OnOffPicker(Gridget):
-    """Helper class to build gridgets allowing to turn things on/off."""
-
-    def color(self, row, column, on_off):
-        """Return the color of the corresponding row/column/state."""
-
-    def lights_on(self):
-        """Return a list of (row,colum) pairs that should be lit."""
-
-    def switch(self, row, column):
-        """Called by the helper when a specific pad is pressed."""
-
-    def show(self):
-        for row in range(1, 9):
-            for column in range(1, 9):
-                self.led(row, column, self.color(row, column, False))
-        for r,c in self.lights_on():
-            self.led(r, c, self.color(r, c, True))
-
-    def pad(self, row, column, velocity):
-        # Only deal with "push" events (not "release")
-        if velocity==0:
-            return
-        # Get current LED state
-        old = self.lights_on()
-        # Dispatch event
-        self.switch(row, column)
-        # Get new LED state
-        new = self.lights_on()
-        # FIXME: for now, deliberately turn everything off then on
-        for (r, c) in old:
-            self.led(r, c, self.color(r, c, False))
-        for (r, c) in new:
-            self.led(r, c, self.color(r, c, True))
-
-
-
-@persist_fields(font=0, group=0, instrument=0, variation=0)
-class ScalePicker(OnOffPicker):
+class ScalePicker(Gridget):
     """
-    ##.###.. # of the key below
+    ##.###.. sharp of the key below
     CDEFGAB. pick key
     ........
-    ##.###.. # of the key below
+    ##.###.. sharp of the key below
     CDEFGAB. keys in scale
     ........
     XXXXXXXX modes
     XXXXXXXX scales
     """
 
-    def __init__(self, note_picker):
-        self.note_picker = note_picker
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.surface["BUTTON_1"] = colors.WHITE
+        self.surface["BUTTON_2"] = colors.GREY_LO
+        self.surface["BUTTON_3"] = colors.GREY_LO
+        self.draw()
 
-    def color(self, row, column, on_off):
-        if on_off:
-            return colors.RED
-        if row == 8 and column in [1, 2, 4, 5, 6]:
-            return colors.MAGENTA_PINK
-        if row == 7 and column != 8:
-            return colors.MAGENTA_PINK
-        if row == 5 and column in [1, 2, 4, 5, 6]:
-            return colors.BLUE_ORCHID
-        if row == 4 and column != 8:
-            return colors.BLUE_ORCHID
-        if row == 2 or row == 1:
-            try:
-                scales.palette[row-1][column-1]
-                return colors.SKY_OCEAN
-            except:
-                pass
-        return colors.BLACK
+    def draw(self):
+        leds = self.get_leds()
+        for led in self.surface:
+            if led in leds:
+                self.surface[led] = leds[led]
+            elif isinstance(led, tuple):
+                row, column = led
+                color = colors.BLACK
+                if row == 8 and column in [1, 2, 4, 5, 6]:
+                    color = colors.MAGENTA_PINK
+                if row == 7 and column != 8:
+                    color = colors.MAGENTA_PINK
+                if row == 5 and column in [1, 2, 4, 5, 6]:
+                    color = colors.BLUE_ORCHID
+                if row == 4 and column != 8:
+                    color = colors.BLUE_ORCHID
+                if row == 2 or row == 1:
+                    try:
+                        scales.palette[row-1][column-1]
+                        color = colors.SKY_OCEAN
+                    except:
+                        pass
+                self.surface[led] = color
 
-    def lights_on(self):
-        # return row,col that should be ON
-        lights = []
+    def get_leds(self):
+        leds = {}
 
-        key = self.note_picker.key
+        key = self.grid.griode.key
 
         row, column = note2piano[key]
-        lights.append((row+6, column))
+        leds[row+6, column] = colors.RED
 
-        scale = self.note_picker.scale
-        for note in scale:
+        current_scale = self.grid.griode.scale
+        for note in current_scale:
             row, column = note2piano[note]
-            lights.append((row+3, column))
+            leds[row+3, column] = colors.RED
 
         for row,line in enumerate(scales.palette):
             for column,scale in enumerate(line):
-                if scale == self.note_picker.scale:
-                    lights.append((row+1, column+1))
+                if scale == current_scale:
+                    leds[row+1, column+1] = colors.RED
 
-        return lights
+        return leds
 
-    def switch(self, row, column):
+    def pad_pressed(self, row, column, velocity):
+        if velocity == 0:
+            return
+
         # Change the key in which we're playing
         if row in [7, 8]:
             note = piano2note.get((row-6, column))
             if note is not None:
-                self.note_picker.key = note
+                self.grid.griode.key = note
 
         # Pick a scale from the palette
         if row in [1, 2]:
             try:
                 scale = scales.palette[row-1][column-1]
-                self.note_picker.scale = scale
+                self.grid.griode.scale = scale
             except IndexError:
                 pass
 
+        self.draw()
+        for grid in self.grid.griode.grids:
+            for notepicker in grid.notepickers:
+                notepicker.redraw()
+
+    def button_pressed(self, button):
+        if button == "BUTTON_2":
+            self.grid.focus(self.grid.notepickers[0])
+        if button == "BUTTON_3":
+            self.grid.focus(self.grid.instrumentpickers[0]) #FIXME move channel
 
 # Maps notes to a pseudo-piano layout
 # (with black keys on the top row and white keys on the bottom row)
@@ -440,6 +405,8 @@ note2piano = [
     ]
 
 piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
+
+##############################################################################
 
 class Layout(object):
     pass
