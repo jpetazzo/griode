@@ -11,7 +11,6 @@ import shelve
 
 # And first, a few constants
 
-# That one is not used yet, but I'm saving this color scheme for later
 channel_colors = [
         colors.RED_HI,
         colors.AMBER_HI,
@@ -30,13 +29,6 @@ channel_colors = [
         colors.ORCHID_LO,
         colors.MAGENTA_LO,
 ]
-
-# This is used by the NotePicker, but should eventually disappear
-color_key      = colors.GREEN_HI
-color_scale    = colors.WHITE
-color_other    = colors.BLACK
-color_physical = colors.RED
-color_musical  = colors.AMBER
 
 ##############################################################################
 
@@ -105,6 +97,8 @@ class NotePicker(Gridget):
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.WHITE
         self.surface["BUTTON_3"] = colors.GREY_LO
+        for button in "UP DOWN LEFT RIGHT".split():
+            self.surface[button] = channel_colors[channel]
         self.channel = channel
         persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
         self.redraw()
@@ -142,10 +136,10 @@ class NotePicker(Gridget):
 
     def note2color(self, note):
         if self.is_key(note):
-            return color_key
+            return channel_colors[self.channel]
         if self.is_in_scale(note):
-            return color_scale
-        return color_other
+            return colors.GREY_LO
+        return colors.BLACK
 
     def redraw(self):
         for led in self.surface:
@@ -212,7 +206,10 @@ class InstrumentPicker(Gridget):
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.GREY_LO
         self.surface["BUTTON_3"] = colors.WHITE
-
+        if channel>0:
+            self.surface["LEFT"] = channel_colors[channel-1]
+        if channel<15:
+            self.surface["RIGHT"] = channel_colors[channel+1]
         self.draw()
 
     @property
@@ -303,6 +300,12 @@ class InstrumentPicker(Gridget):
             self.grid.focus(self.grid.scalepicker)
         if button == "BUTTON_2":
             self.grid.focus(self.grid.notepickers[self.channel])
+        if button == "LEFT" and self.channel>0:
+            self.grid.channel = self.channel-1
+            self.grid.focus(self.grid.instrumentpickers[self.channel-1])
+        if button == "RIGHT" and self.channel<15:
+            self.grid.channel = self.channel+1
+            self.grid.focus(self.grid.instrumentpickers[self.channel+1])
 
 ##############################################################################
 
