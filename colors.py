@@ -61,6 +61,9 @@ COLORS = {
     "PINK_LO": 59,
 }
 
+by_number = dict()
+
 for color in COLORS:
     globals()[color] = COLORS[color]
+    by_number[COLORS[color]] = color
 
