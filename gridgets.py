@@ -21,6 +21,14 @@ channel_colors = [
         colors.BLUE_HI,
         colors.ORCHID_HI,
         colors.MAGENTA_HI,
+        colors.RED_LO,
+        colors.AMBER_LO,
+        colors.YELLOW_LO,
+        colors.GREEN_LO,
+        colors.SKY_LO,
+        colors.BLUE_LO,
+        colors.ORCHID_LO,
+        colors.MAGENTA_LO,
 ]
 
 # This is used by the NotePicker, but should eventually disappear
@@ -201,10 +209,10 @@ class InstrumentPicker(Gridget):
         self.grid = grid
         self.channel = channel
         self.surface = Surface(grid.surface)
-        self.background = Surface(grid.surface)
-        self.background["BUTTON_1"] = colors.GREY_LO
-        self.background["BUTTON_2"] = colors.GREY_LO
-        self.background["BUTTON_3"] = colors.WHITE
+        self.surface["BUTTON_1"] = colors.GREY_LO
+        self.surface["BUTTON_2"] = colors.GREY_LO
+        self.surface["BUTTON_3"] = colors.WHITE
+
         self.draw()
 
     @property
@@ -228,8 +236,11 @@ class InstrumentPicker(Gridget):
         return self.instrs.get(self.devicechain.instr_index, self.instrs[0])
 
     def draw(self):
-        for led in self.background:
-            if isinstance(led, tuple):
+        leds = self.get_leds()
+        for led in self.surface:
+            if led in leds:
+                self.surface[led] = leds[led]
+            elif isinstance(led, tuple):
                 color = colors.BLACK
                 row, column = led
                 if row == 8:
@@ -246,19 +257,11 @@ class InstrumentPicker(Gridget):
                         color = colors.CYAN_SKY
                 if row in [1, 2, 3]:
                     color = self.grid.notepickers[self.channel].surface[led]
-                self.background[led] = color
+                self.surface[led] = color
 
-        foreground = self.foreground
-        for led in self.surface:
-            if led in foreground:
-                self.surface[led] = foreground[led]
-            else:
-                self.surface[led] = self.background[led]
-
-    @property
-    def foreground(self):
+    def get_leds(self):
         # Which leds are supposed to be ON for the current instrument
-        fg = {}
+        leds = {}
         instrument = self.devicechain.instrument
         group_index = instrument.program//8
         instr_index = instrument.program%8
@@ -267,8 +270,8 @@ class InstrumentPicker(Gridget):
                 (7-(group_index//8), 1+group_index%8),
                 (5, 1+instr_index),
                 (4, 1+instrument.bank_index)]:
-            fg[led] = colors.RED
-        return fg
+            leds[led] = colors.RED
+        return leds
 
     def pad_pressed(self, row, col, velocity):
         if row in [1, 2, 3]:
@@ -276,7 +279,7 @@ class InstrumentPicker(Gridget):
             return
         if velocity == 0:
             return
-        if self.background[row, col] == colors.BLACK:
+        if self.surface[row, col] == colors.BLACK:
             return
         if row==8:
             self.devicechain.font_index = col-1
