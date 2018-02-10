@@ -242,6 +242,8 @@ class InstrumentPicker(Gridget):
                     bank_index = column-1
                     if bank_index in self.banks:
                         color = colors.CYAN_SKY
+                if row in [1, 2, 3]:
+                    color = self.grid.notepickers[self.channel].surface[led]
                 self.background[led] = color
 
         foreground = self.foreground
@@ -267,6 +269,9 @@ class InstrumentPicker(Gridget):
         return fg
 
     def pad_pressed(self, row, col, velocity):
+        if row in [1, 2, 3]:
+            self.grid.notepickers[self.channel].pad_pressed(row, col, velocity)
+            return
         if velocity == 0:
             return
         if self.background[row, col] == colors.BLACK:
