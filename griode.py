@@ -10,7 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ColorPicker, NotePicker
+from gridgets import ColorPicker, InstrumentPicker, NotePicker
 import notes
 from persistence import persist_fields
 import scales
@@ -21,7 +21,7 @@ class Griode(object):
 
     def __init__(self):
         self.synth = Fluidsynth()
-        #self.devicechains = [DeviceChain(self, i) for i in range(16)]
+        self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
         for port_name in mido.get_ioport_names():
             if "Launchpad Pro MIDI 2" in port_name:
@@ -43,6 +43,7 @@ class LaunchPad(object):
         self.active_gridget = None # Gridget currently in the foreground
         self.colorpicker = ColorPicker(self)
         self.notepickers = [NotePicker(self, i) for i in range(16)]
+        self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.grid_in.callback = self.process_message
         self.focus(self.notepickers[0])
 
@@ -143,6 +144,32 @@ class LaunchpadMK2(LaunchPad):
 
     setup = []
 
+
+class DeviceChain(object):
+
+    def __init__(self, griode, channel):
+        self.griode = griode
+        self.channel = channel
+        #FIXME persistence
+        # These variables indicate which instrument is currently selected.
+        # Note: perhaps this instrument does not exist. In that case, the
+        # `instrument` property below will fallback to an (existing) one.
+        self.font_index = 0
+        self.group_index = 0
+        self.instr_index = 0
+        self.bank_index = 0
+
+    @property
+    def instrument(self):
+        fonts = self.griode.synth.fonts
+        groups = fonts.get(self.font_index, fonts[0])
+        instrs = groups.get(self.group_index, groups[0])
+        banks = instrs.get(self.instr_index, instrs[0])
+        instrument = banks.get(self.bank_index, banks[0])
+        return instrument
+
+    def send(self, message):
+        self.griode.synth.send(message)
 
 def main():
     griode = Griode()

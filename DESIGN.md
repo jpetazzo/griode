@@ -29,9 +29,14 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
   - synth
     - instruments[]
       - messages()
+    - fonts{font_index}{group}{program}{bank_index}
     - send(message)
   - devicechains[]
     - send(message)
+    - font_index💾
+    - group_index💾
+    - instr_index💾
+    - bank_index💾
   - scale💾
   - key💾
   - grids[]

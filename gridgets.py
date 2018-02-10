@@ -94,6 +94,7 @@ class NotePicker(Gridget):
         self.grid = grid
         self.surface = Surface(grid.surface)
         self.surface["BUTTON_2"] = colors.WHITE
+        self.surface["BUTTON_3"] = colors.GREY_LO
         self.channel = 0
         self.shift = 5
         self.root = 48
@@ -161,7 +162,7 @@ class NotePicker(Gridget):
         elif button == "BUTTON_2":
             pass #FIXME we're already in NotePicker so hum... configure it maybe
         elif button == "BUTTON_3":
-            pass #self.parent.focus("InstrumentPicker")
+            self.grid.focus(self.grid.instrumentpickers[self.channel])
         elif button == "BUTTON_4":
             pass #self.parent.focus("ArpSetup")
 
@@ -171,14 +172,14 @@ class NotePicker(Gridget):
         # FIXME this probably should be moved to the devicechains
         if velocity > 0:
             velocity = 63 + velocity//2
-        # Now play that note!
+        # Send that note to the right devicechain
         message = mido.Message("note_on", note=note, velocity=velocity)
-        self.grid.griode.synth.send(message)
+        self.grid.griode.devicechains[self.channel].send(message)
         # Then light up all instrumentpickers
         for grid in self.grid.griode.grids:
             picker = grid.notepickers[self.channel]
             picker.send(message, self)
-    
+
     def send(self, message, source_object):
         if message.type == "note_on":
             if message.velocity == 0:
@@ -191,6 +192,105 @@ class NotePicker(Gridget):
             for led in leds:
                 self.surface[led] = color
 
+##############################################################################
+
+class InstrumentPicker(Gridget):
+
+    def __init__(self, grid, channel):
+        self.grid = grid
+        self.channel = channel
+        self.surface = Surface(grid.surface)
+        self.background = Surface(grid.surface)
+        self.background["BUTTON_2"] = colors.GREY_LO
+        self.background["BUTTON_3"] = colors.WHITE
+        self.draw()
+
+    @property
+    def devicechain(self):
+        return self.grid.griode.devicechains[self.channel]
+
+    @property
+    def fonts(self):
+        return self.grid.griode.synth.fonts
+
+    @property
+    def groups(self):
+        return self.fonts.get(self.devicechain.font_index, self.fonts[0])
+
+    @property
+    def instrs(self):
+        return self.groups.get(self.devicechain.group_index, self.groups[0])
+
+    @property
+    def banks(self):
+        return self.instrs.get(self.devicechain.instr_index, self.instrs[0])
+
+    def draw(self):
+        for led in self.background:
+            if isinstance(led, tuple):
+                color = colors.BLACK
+                row, column = led
+                if row == 8:
+                    font_index = column-1
+                    if font_index in self.fonts:
+                        color = colors.ROSE
+                if row in [6, 7]:
+                    color = colors.AMBER_YELLOW
+                if row == 5:
+                    color = colors.LIME_GREEN
+                if row == 4:
+                    bank_index = column-1
+                    if bank_index in self.banks:
+                        color = colors.CYAN_SKY
+                self.background[led] = color
+
+        foreground = self.foreground
+        for led in self.surface:
+            if led in foreground:
+                self.surface[led] = foreground[led]
+            else:
+                self.surface[led] = self.background[led]
+
+    @property
+    def foreground(self):
+        # Which leds are supposed to be ON for the current instrument
+        fg = {}
+        instrument = self.devicechain.instrument
+        group_index = instrument.program//8
+        instr_index = instrument.program%8
+        for led in [
+                (8, 1+instrument.font_index),
+                (7-(group_index//8), 1+group_index%8),
+                (5, 1+instr_index),
+                (4, 1+instrument.bank_index)]:
+            fg[led] = colors.RED
+        return fg
+
+    def pad_pressed(self, row, col, velocity):
+        if velocity == 0:
+            return
+        if self.background[row, col] == colors.BLACK:
+            return
+        if row==8:
+            self.devicechain.font_index = col-1
+        if row==7:
+            self.devicechain.group_index = col-1
+        if row==6:
+            self.devicechain.group_index = 8+col-1
+        if row==5:
+            self.devicechain.instr_index = col-1
+        if row==4:
+            self.devicechain.bank_index = col -1
+        # Switch to new instrument
+        instrument = self.devicechain.instrument
+        for message in instrument.messages():
+            self.devicechain.send(message)
+        # Repaint
+        self.draw()
+
+    def button_pressed(self, button):
+        if button == "BUTTON_2":
+            self.grid.focus(self.grid.notepickers[self.channel])
 
 ##############################################################################
 
@@ -253,118 +353,8 @@ class OnOffPicker(Gridget):
             self.led(r, c, self.color(r, c, True))
 
 
-def classify(list_of_things, get_key):
-    """Transform a `list_of_things` into a `dict_of_things`.
-
-    Each thing will be put in dict_of_things[k] where k
-    is obtained by appling the function `get_key` to the thing.
-    """
-    dict_of_things = {}
-    for thing in list_of_things:
-        key = get_key(thing)
-        if key not in dict_of_things:
-            dict_of_things[key] = []
-        dict_of_things[key].append(thing)
-    return dict_of_things
-
 
 @persist_fields(font=0, group=0, instrument=0, variation=0)
-class InstrumentPicker(OnOffPicker):
-
-    def __init__(self, instruments):
-
-        def get_font(i):
-            if i.bank<100:
-                return ("1_melo", i.font)
-            else:
-                return ("2_drum", i.font)
-        def get_group(i):
-            return i.program//8
-        def get_instr(i):
-            return i.program%8
-        def get_bank(i):
-            return i.bank
-
-        self.fonts = classify(instruments, get_font)
-        for font, instruments in self.fonts.items():
-            groups = classify(instruments, get_group)
-            for group, instruments in groups.items():
-                instrs = classify(instruments, get_instr)
-                for instr, instruments in instrs.items():
-                    banks = classify(instruments, get_bank)
-                    instrs[instr] = sorted(banks.items())
-                groups[group] = instrs
-            self.fonts[font] = groups
-        self.fonts = sorted(self.fonts.items())
-
-        # OK, self.fonts is a weird structure!
-        # self.fonts[0..N] = (("X_melodrum", font_num), font)
-        # then in a font you have: font[0..15][0..7] = list of (bank, instrument)
-
-        #self.font = 0       # Index in self.fonts (unrelated to ifluidsynth)
-        #self.group = 0      # General Midi group (0=piano, 1=chroma perc...)
-        #self.instrument = 0 # Instrument in group (0 to 7)
-        #self.variation = 0  # Instrument variation
-
-    def change(self):
-        # Send the relevant program change message
-        font = self.fonts[self.font][1]
-        instrument = font[self.group][self.instrument][self.variation][1][0]
-        for message in instrument.messages():
-            self.synth(message)
-
-    def color(self, row, col, on_off):
-        if on_off:
-            return colors.RED
-        if row == 8:
-            if col in range(1, 1+len(self.fonts)):
-                return colors.ROSE
-        if row == 6 or row == 7:
-            return colors.AMBER_YELLOW
-        if row == 5:
-            return colors.LIME_GREEN
-        if row == 4:
-            font = self.fonts[self.font][1]
-            instrument = font[self.group][self.instrument]
-            if col in range(1, 1+len(instrument)):
-                return colors.CYAN_SKY
-        return colors.BLACK
-
-    def lights_on(self):
-        # Which leds are supposed to be ON for the current instrument
-        return [(8, 1+self.font),
-                (7-(self.group//8), 1+self.group%8),
-                (5, 1+self.instrument),
-                (4, 1+self.variation)]
-
-
-    def switch(self, row, col):
-        if row==8:
-            self.font = col-1
-        if row==7:
-            self.group = col-1
-        if row==6:
-            self.group = 8+col-1
-        if row==5:
-            self.instrument = col-1
-        if row==4:
-            self.variation = col -1
-        # OK, now check that we didn't end up with an invalid combination
-        font = self.fonts[self.font][1]
-        if self.group not in font:
-            self.group = 0
-        if self.instrument not in font[self.group]:
-            self.instrument = 0
-        if self.variation >= len(font[self.group][self.instrument]):
-            self.variation = 0
-        # Also, update the variation row
-        for c in range(1, 9):
-            self.led(4, c, self.color(4, c, False))
-        # Switch to new instrument
-        self.change()
-
-
-
 class ScalePicker(OnOffPicker):
     """
     ##.###.. # of the key below
