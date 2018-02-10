@@ -48,8 +48,12 @@ class LaunchPad(object):
         self.focus(self.notepickers[0])
 
     def focus(self, gridget):
+        # De-focus the current active gridget
+        if self.active_gridget:
+            self.active_gridget.surface.parent = None
+        # Set active gridget
         self.active_gridget = gridget
-        # For now, allow the gridget to draw directly on us (FIXME later)
+        # Focus the new active gridget
         gridget.surface.parent = self.surface
         # Now draw the gridget on us
         for led in gridget.surface:
