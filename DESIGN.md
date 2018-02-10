@@ -40,8 +40,7 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
   - scale💾
   - key💾
   - grids[]
-    - pads
-    - buttons
+    - channel💾
     - focus(gridget)
     - surface
     - colorpicker

@@ -3,7 +3,7 @@ import mido
 
 import colors
 import notes
-from persistence import persist_fields
+from persistence import persistent_attrs, persistent_attrs_init
 import scales
 import shelve
 
@@ -88,6 +88,7 @@ class ColorPicker(Gridget):
 
 ##############################################################################
 
+@persistent_attrs(shift=5, root=48)
 class NotePicker(Gridget):
 
     def __init__(self, grid, channel):
@@ -96,9 +97,8 @@ class NotePicker(Gridget):
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.WHITE
         self.surface["BUTTON_3"] = colors.GREY_LO
-        self.channel = 0
-        self.shift = 5
-        self.root = 48
+        self.channel = channel
+        persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
         self.redraw()
 
     @property
@@ -416,7 +416,7 @@ piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
 class Layout(object):
     pass
 
-@persist_fields(
+dict(
         interval=6, # 24 = quarter note, 12 = eigth note, etc.
         steps = [[4, 3], [1, 2], [3, 1], [1, 2]],
         number_of_steps=4,

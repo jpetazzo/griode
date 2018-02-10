@@ -12,14 +12,14 @@ import colors
 from fluidsynth import Fluidsynth
 from gridgets import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import notes
-from persistence import persist_fields
+from persistence import persistent_attrs, persistent_attrs_init
 import scales
 
-
-@persist_fields(key=notes.C, scale=scales.MAJOR)
+@persistent_attrs(key=notes.C, scale=scales.MAJOR)
 class Griode(object):
 
     def __init__(self):
+        persistent_attrs_init(self)
         self.synth = Fluidsynth()
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
@@ -29,9 +29,11 @@ class Griode(object):
             if "Launchpad MK2" in port_name:
                 self.grids.append(LaunchpadMK2(self, port_name))
 
+@persistent_attrs(channel=0)
 class LaunchPad(object):
 
     def __init__(self, griode, port_name):
+        persistent_attrs_init(self, port_name)
         self.griode = griode
         self.port_name = port_name
         logging.info("Opening grid device {}".format(port_name))
@@ -46,7 +48,7 @@ class LaunchPad(object):
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)
         self.grid_in.callback = self.process_message
-        self.focus(self.notepickers[0])
+        self.focus(self.notepickers[self.channel])
 
     def focus(self, gridget):
         # De-focus the current active gridget
@@ -150,20 +152,19 @@ class LaunchpadMK2(LaunchPad):
     setup = []
 
 
+@persistent_attrs(font_index=0, group_index=0, instr_index=0, bank_index=0)
 class DeviceChain(object):
 
     def __init__(self, griode, channel):
         self.griode = griode
         self.channel = channel
-        #FIXME persistence
-        # These variables indicate which instrument is currently selected.
-        # Note: perhaps this instrument does not exist. In that case, the
-        # `instrument` property below will fallback to an (existing) one.
-        self.font_index = 0
-        self.group_index = 0
-        self.instr_index = 0
-        self.bank_index = 0
+        persistent_attrs_init(self, str(channel))
+        for message in self.instrument.messages():
+            self.send(message)
 
+    # The variables `..._index` indicate which instrument is currently selected.
+    # Note: perhaps this instrument does not exist. In that case, the
+    # `instrument` property below will fallback to an (existing) one.
     @property
     def instrument(self):
         fonts = self.griode.synth.fonts
@@ -174,7 +175,7 @@ class DeviceChain(object):
         return instrument
 
     def send(self, message):
-        self.griode.synth.send(message)
+        self.griode.synth.send(message.copy(channel=self.channel))
 
 def main():
     griode = Griode()
