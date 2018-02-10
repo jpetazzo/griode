@@ -26,6 +26,7 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
 ## Data model
 
 - griode
+  - beatclock
   - synth
     - instruments[]
       - messages()
@@ -37,6 +38,13 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
     - group_index💾
     - instr_index💾
     - bank_index💾
+    - arpeggiator
+      - enabled💾
+      - pattern_length💾
+      - interval💾
+      - pattern[]💾
+      - multi_notes[]💾
+      - tick(tick)
   - scale💾
   - key💾
   - grids[]
@@ -50,6 +58,8 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
       - change(instrument)
     - scalepicker
       - change(...)
+    - arpconfigs[]
+      - step(step)
 
 
 ## Gridget interface

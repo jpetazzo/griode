@@ -97,6 +97,7 @@ class NotePicker(Gridget):
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.WHITE
         self.surface["BUTTON_3"] = colors.GREY_LO
+        self.surface["BUTTON_4"] = colors.GREY_LO
         for button in "UP DOWN LEFT RIGHT".split():
             self.surface[button] = channel_colors[channel]
         self.channel = channel
@@ -167,7 +168,7 @@ class NotePicker(Gridget):
         elif button == "BUTTON_3":
             self.grid.focus(self.grid.instrumentpickers[self.channel])
         elif button == "BUTTON_4":
-            pass #self.parent.focus("ArpSetup")
+            self.grid.focus(self.grid.arpconfigs[self.channel])
 
     def pad_pressed(self, row, column, velocity):
         note = self.rowcol2note(row, column)
@@ -206,6 +207,7 @@ class InstrumentPicker(Gridget):
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.GREY_LO
         self.surface["BUTTON_3"] = colors.WHITE
+        self.surface["BUTTON_4"] = colors.GREY_LO
         if channel>0:
             self.surface["LEFT"] = channel_colors[channel-1]
         if channel<15:
@@ -327,6 +329,7 @@ class ScalePicker(Gridget):
         self.surface["BUTTON_1"] = colors.WHITE
         self.surface["BUTTON_2"] = colors.GREY_LO
         self.surface["BUTTON_3"] = colors.GREY_LO
+        self.surface["BUTTON_4"] = colors.GREY_LO
         self.draw()
 
     def draw(self):
@@ -419,99 +422,61 @@ piano2note = { (r,c): n for (n, (r,c)) in enumerate(note2piano) }
 
 ##############################################################################
 
-class Layout(object):
-    pass
+class ArpConfig(Gridget):
 
-dict(
-        interval=6, # 24 = quarter note, 12 = eigth note, etc.
-        steps = [[4, 3], [1, 2], [3, 1], [1, 2]],
-        number_of_steps=4,
-        )
-class Arpeggiator(Layout):
+    def __init__(self, grid, channel):
+        self.grid = grid
+        self.channel = channel
+        self.surface = Surface(grid.surface)
+        self.surface["BUTTON_1"] = colors.GREY_LO
+        self.surface["BUTTON_2"] = colors.GREY_LO
+        self.surface["BUTTON_3"] = colors.GREY_LO
+        self.surface["BUTTON_4"] = colors.WHITE
+        self.draw()
 
-    def __init__(self, synth):
-        self.next_step = 0
-        self.last_tick = 0
-        self.next_tick = 0
-        self.multi_notes = [0, 12]
-        self.notes = []
-        self.playing = []
-        self.real_synth = synth
+    @property
+    def arpeggiator(self):
+        return self.grid.griode.devicechains[self.channel].arpeggiator
 
-    def color(self, row, column):
-        if column > self.number_of_steps:
-            if row == 1:
-                return colors.GREEN_LO
-            else:
-                return colors.BLACK
-        velocity, gate = self.steps[column-1]
-        if row == 1:
-            return colors.GREEN_HI
-        if row in [2, 3, 4]:
-            if gate > row-2:
-                return colors.SPRING
-        if row in [5, 6, 7, 8]:
-            if velocity > row-5:
-                return colors.LIME
-        return colors.BLACK
+    def draw(self):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                color = colors.BLACK
+                row, column = led
+                if column > self.arpeggiator.pattern_length:
+                    if row == 1:
+                        color = colors.GREEN_LO
+                else:
+                    velocity, gate = self.arpeggiator.pattern[column-1]
+                    if row == 1:
+                        color = colors.GREEN_HI
+                    if row in [2, 3, 4]:
+                        if gate > row-2:
+                            color = colors.SPRING
+                    if row in [5, 6, 7, 8]:
+                        if velocity > row-5:
+                            color = colors.LIME
+                self.surface[led] = color
 
-    def show(self):
-        for row in range(1, 9):
-            for column in range(1, 9):
-                self.led(row, column, self.color(row, column))
-
-    def pad(self, row, column, velocity):
+    def pad_pressed(self, row, column, velocity):
         if velocity == 0:
             return
         if row == 1:
-            self.number_of_steps = column
-            while len(self.steps) < self.number_of_steps:
-                self.steps.append([1,1])
+            while len(self.arpeggiator.pattern) < column:
+                self.arpeggiator.pattern.append([1,1])
+            self.arpeggiator.pattern_length = column
         if row in [2, 3, 4]:
-            self.steps[column-1][1] = row-1
+            self.arpeggiator.pattern[column-1][1] = row-1
         if row in [5, 6, 7, 8]:
-            self.steps[column-1][0] = row-4
-        self.show()
-        # FIXME: redraw only what's necessary
+            self.arpeggiator.pattern[column-1][0] = row-4
+        self.draw()
 
-    def tick(self, tick):
-        self.last_tick = tick
-        # OK, first, let's see if some notes have "expired" and should be stopped
-        for note,deadline in self.playing:
-            if tick > deadline:
-                self.real_synth(mido.Message("note_on", note=note, velocity=0))
-                self.playing.remove((note, deadline))
-        # Then, is it time to spell out the next note?
-        if tick < self.next_tick:
-            return
-        # OK, is there any note in the buffer?
-        if self.notes == []:
-            return
-        # Yay we have notes to play!
-        velocity, gate = self.steps[self.next_step]
-        velocity = velocity*31
-        duration = gate*2
-        self.real_synth(mido.Message("note_on", note=self.notes[0], velocity=velocity))
-        self.playing.append((self.notes[0], tick+duration))
-        self.notes = self.notes[1:] + [self.notes[0]]
-        self.next_tick += self.interval
-        self.next_step += 1
-        if self.next_step >= self.number_of_steps:
-            self.next_step = 0
-
-    def synth(self, message):
-        if message.type == "note_on":
-            if message.velocity > 0:
-                if self.notes == []:
-                    self.next_tick = self.last_tick + 1
-                    self.next_step = 0
-                for i, offset in enumerate(self.multi_notes):
-                    insert_position = i + i*len(self.notes)//len(self.multi_notes)
-                    self.notes.insert(insert_position, message.note+offset)
-            else:
-                if message.note in self.notes:
-                    for offset in self.multi_notes:
-                        self.notes.remove(message.note+offset)
-        else:
-            self.real_synth(message)
-
+    def button_pressed(self, button):
+        if button == "BUTTON_1":
+            self.grid.focus(self.grid.scalepicker)
+        if button == "BUTTON_2":
+            self.grid.focus(self.grid.notepickers[self.channel])
+        if button == "BUTTON_3":
+            self.grid.focus(self.grid.instrumentpickers[self.channel])
+        if button == "BUTTON_4":
+            pass # FIXME toggle arp
