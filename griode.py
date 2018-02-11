@@ -270,6 +270,10 @@ class BeatClock(object):
         self.next += 60.0 / self.bpm / 24
         if now > self.next:
             print("We're running late by {} seconds!".format(self.next-now))
+            # If we are late by more than 1 second, catch up.
+            if now > self.next + 1.0:
+                print("Cactching up (deciding that next tick = now).")
+                self.next = now
             return 0
         return self.next - now
 
