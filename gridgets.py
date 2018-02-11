@@ -479,4 +479,4 @@ class ArpConfig(Gridget):
         if button == "BUTTON_3":
             self.grid.focus(self.grid.instrumentpickers[self.channel])
         if button == "BUTTON_4":
-            pass # FIXME toggle arp
+            self.arpeggiator.enabled = not self.arpeggiator.enabled

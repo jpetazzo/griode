@@ -5,7 +5,8 @@ def persistent_attrs(**kwargs):
     def wrap_class(klass):
         for attr_name, default_value in kwargs.items():
             def getter(self, attr_name=attr_name, default_value=default_value):
-                logging.debug("Getting {}/{}".format(self.db_filename, attr_name))
+                # Commenting that one out because it's way too verbose right now
+                #logging.debug("Getting {}/{}".format(self.db_filename, attr_name))
                 if attr_name not in self.db:
                     logging.debug(
                         "Initializing {}/{} with default value {}"

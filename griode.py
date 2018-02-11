@@ -207,6 +207,10 @@ class Arpeggiator(object):
             if tick > deadline:
                 self.output(mido.Message("note_on", note=note, velocity=0))
                 self.playing.remove((note, deadline))
+        # If we're disabled, stop right there
+        if self.enabled == False:
+            self.notes.clear()
+            return
         # Then, is it time to spell out the next note?
         if tick < self.next_tick:
             return
@@ -226,9 +230,7 @@ class Arpeggiator(object):
             self.next_step = 0
 
     def input(self, message):
-        if message.type != "note_on":
-            self.output(message)
-        else:
+        if message.type == "note_on" and self.enabled:
             if message.velocity > 0:
                 if self.notes == []:
                     self.next_tick = self.last_tick + 1
@@ -240,6 +242,8 @@ class Arpeggiator(object):
                 if message.note in self.notes:
                     for offset in self.multi_notes:
                         self.notes.remove(message.note+offset)
+        else:
+            self.output(message)
 
 ##############################################################################
 
