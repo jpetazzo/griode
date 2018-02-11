@@ -61,6 +61,10 @@ class Fluidsynth(object):
         # Build the fonts structure
         self.fonts = build_fonts(self.instruments)
 
+        # Re-order the instruments list
+        # (This is used to cycle through instruments in order)
+        self.instruments.sort(key=lambda i: (i.font_index, i.program, i.bank_index))
+
         # Find the MIDI port created by fluidsynth and open it
         fluidsynth_ports = [p for p in mido.get_output_names() if "griode" in p]
         if len(fluidsynth_ports) == 0:

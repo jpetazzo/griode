@@ -208,6 +208,8 @@ class InstrumentPicker(Gridget):
         self.surface["BUTTON_2"] = colors.GREY_LO
         self.surface["BUTTON_3"] = colors.WHITE
         self.surface["BUTTON_4"] = colors.GREY_LO
+        self.surface["UP"] = channel_colors[channel]
+        self.surface["DOWN"] = channel_colors[channel]
         if channel>0:
             self.surface["LEFT"] = channel_colors[channel-1]
         if channel<15:
@@ -308,6 +310,27 @@ class InstrumentPicker(Gridget):
         if button == "RIGHT" and self.channel<15:
             self.grid.channel = self.channel+1
             self.grid.focus(self.grid.instrumentpickers[self.channel+1])
+        if button in ["UP", "DOWN"]:
+            instruments = self.grid.griode.synth.instruments
+            instrument_index = instruments.index(self.devicechain.instrument)
+            if button == "UP":
+                instrument_index += 1
+            else:
+                instrument_index -= 1
+            if instrument_index < 0:
+                instrument = instruments[-1]
+            elif instrument_index >= len(instruments):
+                instrument = instruments[0]
+            else:
+                instrument = instruments[instrument_index]
+                self.devicechain.font_index = instrument.font_index
+                self.devicechain.group_index = instrument.program//8
+                self.devicechain.instr_index = instrument.program%8
+                self.devicechain.bank_index = instrument.bank_index
+            for message in self.devicechain.instrument.messages():
+                self.devicechain.send(message)
+            self.draw()
+
 
 ##############################################################################
 
