@@ -1,5 +1,6 @@
 import logging
 import mido
+import os
 import subprocess
 
 
@@ -27,11 +28,18 @@ class Instrument(object):
 class Fluidsynth(object):
 
     def __init__(self):
+        default_soundfont = "soundfonts/default.sf2"
+
+        # Pre-flight check
+        if not os.path.isfile(default_soundfont):
+            print("File {} not found. Fluidsynth cannot start.".format(default_soundfont))
+            print("Go to the soundfonts/ directory and run the download script!")
+            exit(1)
 
         # Spawn fluidsynth process
         self.fluidsynth = subprocess.Popen(
             ["fluidsynth", "-a", "pulseaudio",
-            "-c", "8", "-p", "griode", "default.sf2"],
+            "-c", "8", "-p", "griode", default_soundfont],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
             )
 

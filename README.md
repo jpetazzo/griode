@@ -34,6 +34,17 @@ On Debian/Ubuntu systems, `apt-get install fluidsynth` will do the trick.
 
 ### Installing SoundFonts
 
+Go to the `soundfonts` subdirectory, and run the script `download-soundfonts.sh`.
+
+Alternatively, you can download your own soundfonts, place them in this directory,
+and create a symlink `default.sf2` pointing to the soundfont you want to use.
+
+Note: Griode only supports one soundfont at a time right now, but this will
+change in the future.
+
+
+#### What are soundfonts?
+
 SoundFonts are instrument banks used by some audio hardware and by FluidSynth
 to generate notes of music. The typical extension for SoundFont files is `.sf2`.
 
@@ -45,15 +56,12 @@ SoundFonts are huge: I saw some 1 GB SoundFonts out there with just a couple
 of piano instruments in them, but in very high quality (i.e. using different
 samples for each note and for different velocity levels.)
 
-The script `download-soundfonts.sh` will try to download a few SoundFonts
-for you.  Then create a symlink named `default.sf2` pointing to the SoundFont
-of your choice.
-
 Here are a few links to some SF2 files:
 - [GeneralUser](http://www.schristiancollins.com/generaluser.php)
 - [Fluid SoundFont](https://packages.debian.org/source/sid/fluid-soundfont)
 - [Soundfonts4U](https://sites.google.com/site/soundfonts4u/)
 - [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
+
 
 ### Usage
 
