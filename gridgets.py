@@ -451,11 +451,14 @@ class ArpConfig(Gridget):
         self.grid = grid
         self.channel = channel
         self.current_step = 0
+        self.display_offset = 0 # Step shown on first column
         self.surface = Surface(grid.surface)
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.GREY_LO
         self.surface["BUTTON_3"] = colors.GREY_LO
         self.surface["BUTTON_4"] = colors.WHITE
+        self.surface["LEFT"] = channel_colors[self.channel]
+        self.surface["RIGHT"] = channel_colors[self.channel]
         self.draw()
 
     @property
@@ -467,13 +470,14 @@ class ArpConfig(Gridget):
             if isinstance(led, tuple):
                 color = colors.BLACK
                 row, column = led
-                if column > self.arpeggiator.pattern_length:
+                step = column - 1 + self.display_offset
+                if step >= self.arpeggiator.pattern_length:
                     if row == 1:
                         color = colors.GREEN_LO
                 else:
-                    velocity, gate = self.arpeggiator.pattern[column-1]
+                    velocity, gate = self.arpeggiator.pattern[step]
                     if row == 1:
-                        if column == self.current_step+1:
+                        if step == self.current_step:
                             color = colors.AMBER
                         else:
                             color = colors.GREEN_HI
@@ -488,14 +492,15 @@ class ArpConfig(Gridget):
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
             return
+        step = column - 1 + self.display_offset
         if row == 1:
-            while len(self.arpeggiator.pattern) < column:
+            while len(self.arpeggiator.pattern) <= step:
                 self.arpeggiator.pattern.append([1,1])
-            self.arpeggiator.pattern_length = column
+            self.arpeggiator.pattern_length = step+1
         if row in [2, 3, 4]:
-            self.arpeggiator.pattern[column-1][1] = row-1
+            self.arpeggiator.pattern[step][1] = row-1
         if row in [5, 6, 7, 8]:
-            self.arpeggiator.pattern[column-1][0] = row-4
+            self.arpeggiator.pattern[step][0] = row-4
         self.draw()
 
     def button_pressed(self, button):
@@ -507,3 +512,11 @@ class ArpConfig(Gridget):
             self.grid.focus(self.grid.instrumentpickers[self.channel])
         if button == "BUTTON_4":
             self.arpeggiator.enabled = not self.arpeggiator.enabled
+        if button == "LEFT":
+            if self.display_offset > 0:
+                self.display_offset -= 1
+                self.draw()
+        if button == "RIGHT":
+            if self.display_offset < self.arpeggiator.pattern_length - 2:
+                self.display_offset += 1
+                self.draw()
