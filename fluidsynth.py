@@ -31,7 +31,7 @@ class Fluidsynth(object):
         # Spawn fluidsynth process
         self.fluidsynth = subprocess.Popen(
             ["fluidsynth", "-a", "pulseaudio",
-            "-r", "8", "-c", "8", "-p", "griode", "default.sf2"],
+            "-c", "8", "-p", "griode", "default.sf2"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
             )
 
