@@ -450,6 +450,7 @@ class ArpConfig(Gridget):
     def __init__(self, grid, channel):
         self.grid = grid
         self.channel = channel
+        self.current_step = 0
         self.surface = Surface(grid.surface)
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.GREY_LO
@@ -472,7 +473,10 @@ class ArpConfig(Gridget):
                 else:
                     velocity, gate = self.arpeggiator.pattern[column-1]
                     if row == 1:
-                        color = colors.GREEN_HI
+                        if column == self.current_step+1:
+                            color = colors.AMBER
+                        else:
+                            color = colors.GREEN_HI
                     if row in [2, 3, 4]:
                         if gate > row-2:
                             color = colors.SPRING

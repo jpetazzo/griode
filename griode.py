@@ -224,6 +224,12 @@ class Arpeggiator(object):
         self.output(mido.Message("note_on", note=self.notes[0], velocity=velocity))
         self.playing.append((self.notes[0], tick+duration))
         self.notes = self.notes[1:] + [self.notes[0]]
+        # Update displays
+        for grid in self.devicechain.griode.grids:
+            arpconfig = grid.arpconfigs[self.devicechain.channel]
+            arpconfig.current_step = self.next_step
+            arpconfig.draw()
+        # And prepare for next step
         self.next_tick += self.interval
         self.next_step += 1
         if self.next_step >= self.pattern_length:
