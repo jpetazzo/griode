@@ -102,7 +102,7 @@ class NotePicker(Gridget):
             self.surface[button] = channel_colors[channel]
         self.channel = channel
         persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
-        self.redraw()
+        self.draw()
 
     @property
     def key(self):
@@ -142,7 +142,7 @@ class NotePicker(Gridget):
             return colors.GREY_LO
         return colors.BLACK
 
-    def redraw(self):
+    def draw(self):
         for led in self.surface:
             if isinstance(led, tuple):
                 row, column = led
@@ -157,10 +157,10 @@ class NotePicker(Gridget):
             self.root -= 12
         elif button == "LEFT":
             self.root -= 1
-            self.redraw()
+            self.draw()
         elif button == "RIGHT":
             self.root += 1
-            self.redraw()
+            self.draw()
         elif button == "BUTTON_1":
             self.grid.focus(self.grid.scalepicker)
         elif button == "BUTTON_2":
@@ -402,7 +402,7 @@ class ScalePicker(Gridget):
         self.draw()
         for grid in self.grid.griode.grids:
             for notepicker in grid.notepickers:
-                notepicker.redraw()
+                notepicker.draw()
 
     def button_pressed(self, button):
         if button == "BUTTON_2":
