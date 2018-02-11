@@ -24,9 +24,9 @@ def persistent_attrs(**kwargs):
     
 def persistent_attrs_init(self, id_str=None):
     if id_str is None:
-        self.db_filename = "{}.sav".format(self.__class__.__name__)
+        self.db_filename = "state/{}.sav".format(self.__class__.__name__)
     else:
-        self.db_filename = "{}__{}.sav".format(self.__class__.__name__, id_str)
+        self.db_filename = "state/{}__{}.sav".format(self.__class__.__name__, id_str)
     logging.debug("Opening shelf {}".format(self.db_filename))
     self.db = shelve.open(self.db_filename, writeback=True)
 
