@@ -406,9 +406,9 @@ class ScalePicker(Gridget):
 
     def button_pressed(self, button):
         if button == "BUTTON_2":
-            self.grid.focus(self.grid.notepickers[0])
+            self.grid.focus(self.grid.notepickers[self.grid.channel])
         if button == "BUTTON_3":
-            self.grid.focus(self.grid.instrumentpickers[0]) #FIXME move channel
+            self.grid.focus(self.grid.instrumentpickers[self.grid.channel])
 
 # Maps notes to a pseudo-piano layout
 # (with black keys on the top row and white keys on the bottom row)
