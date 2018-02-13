@@ -27,6 +27,23 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
 
 - griode
   - beatclock
+  - looper
+    - input()
+    - output()
+    - tick()
+    - beats_per_bar💾
+    - loops[line,column]💾
+      - play()
+      - stop()
+      - record()
+      - channel
+      - first_bar
+      - last_bar
+      - notes[]
+        - note
+        - velocity
+        - start      } these are integer values in ticks
+        - duration   } (so 24 = 1 quarter note)
   - synth
     - instruments[]
       - messages()
@@ -43,13 +60,13 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
       - pattern_length💾
       - interval💾
       - pattern[]💾
-      - multi_notes[]💾
+        (velocity, gate, [harmonies])
       - tick(tick)
   - scale💾
   - key💾
   - grids[]
     - channel💾
-    - focus(gridget)
+    - focus(gridget, leds[])
     - surface
     - colorpicker
     - notepickers[]
@@ -60,6 +77,8 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
       - change(...)
     - arpconfigs[]
       - step(step)
+    - loopcontroller
+      - tick(tick)
 
 
 ## Gridget interface

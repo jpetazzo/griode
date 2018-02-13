@@ -39,8 +39,9 @@ class Surface(object):
         self.leds = {}
         for led in parent:
             self.leds[led] = colors.BLACK
-        # But don't display ourself on the parent yet
-        self.parent = None
+        # Setup the masked surface
+        # (By default, it filters out all display)
+        self.parent = MaskedSurface(parent)
 
     def __iter__(self):
         return self.leds.__iter__()
@@ -57,6 +58,19 @@ class Surface(object):
                 self.leds[led] = color
                 if self.parent:
                     self.parent[led] = color
+
+class MaskedSurface(object):
+
+    def __init__(self, parent):
+        self.parent = parent
+        self.mask = set() # leds that are ALLOWED
+
+    def __iter__(self):
+        return self.mask.__iter__()
+
+    def __setitem__(self, led, color):
+        if led in self.mask:
+            self.parent[led] = color
 
 ##############################################################################
 
@@ -162,7 +176,7 @@ class NotePicker(Gridget):
             self.root += 1
             self.draw()
         elif button == "BUTTON_1":
-            self.grid.focus(self.grid.scalepicker)
+            self.grid.focus(self.grid.loopcontroller)
         elif button == "BUTTON_2":
             pass #FIXME we're already in NotePicker so hum... configure it maybe
         elif button == "BUTTON_3":
@@ -301,7 +315,7 @@ class InstrumentPicker(Gridget):
 
     def button_pressed(self, button):
         if button == "BUTTON_1":
-            self.grid.focus(self.grid.scalepicker)
+            self.grid.focus(self.grid.loopcontroller)
         if button == "BUTTON_2":
             self.grid.focus(self.grid.notepickers[self.channel])
         if button == "LEFT" and self.channel>0:
@@ -452,6 +466,7 @@ class ArpConfig(Gridget):
         self.channel = channel
         self.current_step = 0
         self.display_offset = 0 # Step shown on first column
+        self.page = "VELOGATE" # or "MOTIF"
         self.surface = Surface(grid.surface)
         self.surface["BUTTON_1"] = colors.GREY_LO
         self.surface["BUTTON_2"] = colors.GREY_LO
@@ -475,37 +490,51 @@ class ArpConfig(Gridget):
                     if row == 1:
                         color = colors.GREEN_LO
                 else:
-                    velocity, gate = self.arpeggiator.pattern[step]
-                    if row == 1:
-                        if step == self.current_step:
-                            color = colors.AMBER
-                        else:
-                            color = colors.GREEN_HI
-                    if row in [2, 3, 4]:
-                        if gate > row-2:
-                            color = colors.SPRING
-                    if row in [5, 6, 7, 8]:
-                        if velocity > row-5:
-                            color = colors.LIME
+                    velocity, gate, harmonies = self.arpeggiator.pattern[step]
+                    if self.page == "VELOGATE":
+                        if row == 1:
+                            if step == self.current_step:
+                                color = colors.AMBER
+                            else:
+                                color = colors.GREEN_HI
+                        if row in [2, 3, 4]:
+                            if gate > row-2:
+                                color = colors.SPRING
+                        if row in [5, 6, 7, 8]:
+                            if velocity > row-5:
+                                color = colors.LIME
+                    if self.page == "MOTIF":
+                        if row-1 in harmonies:
+                            if step == self.current_step:
+                                color = colors.AMBER
+                            else:
+                                color = colors.GREEN
                 self.surface[led] = color
 
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
             return
         step = column - 1 + self.display_offset
-        if row == 1:
-            while len(self.arpeggiator.pattern) <= step:
-                self.arpeggiator.pattern.append([1,1])
-            self.arpeggiator.pattern_length = step+1
-        if row in [2, 3, 4]:
-            self.arpeggiator.pattern[step][1] = row-1
-        if row in [5, 6, 7, 8]:
-            self.arpeggiator.pattern[step][0] = row-4
+        if self.page == "VELOGATE":
+            if row == 1:
+                while len(self.arpeggiator.pattern) <= step:
+                    self.arpeggiator.pattern.append([1,1, [0]]) # FIXME octave
+                self.arpeggiator.pattern_length = step+1
+            if row in [2, 3, 4]:
+                self.arpeggiator.pattern[step][1] = row-1
+            if row in [5, 6, 7, 8]:
+                self.arpeggiator.pattern[step][0] = row-4
+        if self.page == "MOTIF":
+            harmony = row-1
+            if harmony in self.arpeggiator.pattern[step][2]:
+                self.arpeggiator.pattern[step][2].remove(harmony)
+            else:
+                self.arpeggiator.pattern[step][2].append(harmony)
         self.draw()
 
     def button_pressed(self, button):
         if button == "BUTTON_1":
-            self.grid.focus(self.grid.scalepicker)
+            self.grid.focus(self.grid.loopcontroller)
         if button == "BUTTON_2":
             self.grid.focus(self.grid.notepickers[self.channel])
         if button == "BUTTON_3":
@@ -520,3 +549,65 @@ class ArpConfig(Gridget):
             if self.display_offset < self.arpeggiator.pattern_length - 2:
                 self.display_offset += 1
                 self.draw()
+        if button == "UP":
+            self.page = "VELOGATE"
+            self.draw()
+        if button == "DOWN":
+            self.page = "MOTIF"
+            self.draw()
+
+##############################################################################
+
+class LoopController(Gridget):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.draw()
+
+    @property
+    def looper(self):
+        return self.grid.griode.looper
+
+    def draw(self):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                color = colors.BLACK
+                if row in [1, 2, 3, 4]: # loops
+                    line = 5-row
+                    loop = self.grid.griode.looper.loops.get((line, column))
+                    if loop:
+                        color = channel_colors[loop.channel]
+                    else:
+                        color = colors.GREY_LO
+                self.surface[led] = color
+
+    def tick(self, tick):
+        absolute_beat = tick//24
+        beats_per_bar = self.looper.beats_per_bar
+        beat_in_bar = absolute_beat%beats_per_bar
+        row = 8
+        for column in range(1,9): #FIXME
+            color = colors.BLACK
+            if beat_in_bar+1 == column:
+                color = colors.GREEN_HI
+            elif column <= beats_per_bar:
+                color = colors.GREEN_LO
+            self.surface[row, column] = color
+
+    def button_pressed(self, button):
+        if button == "BUTTON_1":
+            self.grid.focus(self.grid.scalepicker)
+        if button == "BUTTON_2":
+            self.grid.focus(self.grid.notepickers[self.grid.channel])
+
+    def pad_pressed(self, row, column, velocity):
+        if velocity == 0:
+            return
+        if row in [1, 2, 3, 4]:
+            line = 5-row
+            if (line, column) not in self.looper.loops:
+                self.looper.loops[line, column] = self.looper.Loop(self.looper, self.grid.channel)
+            self.looper.loops[line, column].record()
+

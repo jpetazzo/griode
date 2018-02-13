@@ -10,10 +10,13 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ArpConfig, ColorPicker, InstrumentPicker, NotePicker, ScalePicker
+from gridgets import ArpConfig, ColorPicker, InstrumentPicker, LoopController, NotePicker, ScalePicker
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 import scales
+
+ARROWS = "UP DOWN LEFT RIGHT".split()
+MENU = "BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()
 
 @persistent_attrs(key=notes.C, scale=scales.MAJOR)
 class Griode(object):
@@ -24,6 +27,7 @@ class Griode(object):
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
         self.beatclock = BeatClock(self)
+        self.looper = Looper(self)
         for port_name in mido.get_ioport_names():
             if "Launchpad Pro MIDI 2" in port_name:
                 self.grids.append(LaunchpadPro(self, port_name))
@@ -43,33 +47,35 @@ class LaunchPad(object):
         for message in self.setup:
             self.grid_out.send(message)
         self.surface = LPSurface(self)
-        self.active_gridget = None # Gridget currently in the foreground
+        self.surface_map = dict() # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)
         self.arpconfigs = [ArpConfig(self, i) for i in range(16)]
+        self.loopcontroller = LoopController(self)
         self.grid_in.callback = self.process_message
         self.focus(self.notepickers[self.channel])
 
-    def focus(self, gridget):
-        # De-focus the current active gridget
-        if self.active_gridget:
-            self.active_gridget.surface.parent = None
-        # Set active gridget
-        self.active_gridget = gridget
-        # Focus the new active gridget
-        gridget.surface.parent = self.surface
-        # Now draw the gridget on us
-        for led in gridget.surface:
+    def focus(self, gridget, leds=None):
+        # By default, map the gridget to everything, except MENU
+        if leds is None:
+            leds = [led for led in self.surface]
+            #leds = [led for led in self.surface if led not in MENU]
+        # For each mapped led ...
+        for led in leds:
+            # Unmap the widget(s) that was "owning" that led
+            if led in self.surface_map:
+                self.surface_map[led].surface.parent.mask.remove(led)
+            # Update the map
+            self.surface_map[led] = gridget
+            # Map the new widget
+            gridget.surface.parent.mask.add(led)
+            # Draw it
             self.surface[led] = gridget.surface[led]
 
     def process_message(self, message):
         logging.debug("{} got message {}".format(self, message))
-
-        # If there is no active gridget, ignore the message
-        if self.active_gridget is None:
-            return
 
         # Ignore aftertouch messages for now
         if message.type == "polytouch":
@@ -86,15 +92,21 @@ class LaunchPad(object):
 
         if led is None:
             logging.warning("Unhandled message: {}".format(message))
+            return
+
+        gridget = self.surface_map.get(led)
+        if gridget is None:
+            logging.warning("Button {} is not routed to any gridget.".format(led))
+            return
 
         if isinstance(led, tuple):
             row, column = led
-            self.active_gridget.pad_pressed(row, column, velocity)
+            gridget.pad_pressed(row, column, velocity)
         elif isinstance(led, str):
             # Only emit button_pressed when the button is pressed
             # (i.e. not when it is released, which corresponds to value=0)
             if message.value == 127:
-                self.active_gridget.button_pressed(led)
+                gridget.button_pressed(led)
 
 
 class LPSurface(object):
@@ -186,8 +198,7 @@ class DeviceChain(object):
 
 @persistent_attrs(
         enabled=True, interval=6, pattern_length=4,
-        pattern=[[4, 3], [1, 2], [3, 1], [1, 2]],
-        multi_notes=[0, 12]
+        pattern=[[4, 3, [0]], [1, 2, [7]], [3, 1, [0]], [1, 2, [7]]],
         )
 class Arpeggiator(object):
 
@@ -218,11 +229,19 @@ class Arpeggiator(object):
         if self.notes == []:
             return
         # Yay we have notes to play!
-        velocity, gate = self.pattern[self.next_step]
+        velocity, gate, harmonies = self.pattern[self.next_step]
         velocity = velocity*31
         duration = gate*2
-        self.output(mido.Message("note_on", note=self.notes[0], velocity=velocity))
-        self.playing.append((self.notes[0], tick+duration))
+        for harmony in harmonies:
+            offset = 0
+            scale = self.devicechain.griode.scale
+            while harmony >= len(scale):
+                offset += 12
+                harmony -= len(scale)
+            # FIXME allow negative harmony
+            note = self.notes[0] + offset + scale[harmony]
+            self.output(mido.Message("note_on", note=note, velocity=velocity))
+            self.playing.append((note, tick+duration))
         self.notes = self.notes[1:] + [self.notes[0]]
         # Update displays
         for grid in self.devicechain.griode.grids:
@@ -241,13 +260,10 @@ class Arpeggiator(object):
                 if self.notes == []:
                     self.next_tick = self.last_tick + 1
                     self.next_step = 0
-                for i, offset in enumerate(self.multi_notes):
-                    insert_position = i + i*len(self.notes)//len(self.multi_notes)
-                    self.notes.insert(insert_position, message.note+offset)
+                self.notes.insert(0, message.note)
             else:
                 if message.note in self.notes:
-                    for offset in self.multi_notes:
-                        self.notes.remove(message.note+offset)
+                    self.notes.remove(message.note)
         else:
             self.output(message)
 
@@ -265,6 +281,8 @@ class BeatClock(object):
     def callback(self):
         for devicechain in self.griode.devicechains:
             devicechain.arpeggiator.tick(self.tick)
+        for grid in self.griode.grids:
+            grid.loopcontroller.tick(self.tick)
 
     def poll(self):
         now = time.time()
@@ -285,6 +303,95 @@ class BeatClock(object):
 
     def once(self):
         time.sleep(self.poll())
+
+##############################################################################
+
+class Note(object):
+    def __init__(self, note, velocity, start, duration):
+        self.note = note
+        self.velocity = velocity
+        self.start = start
+        self.duration = duration
+
+class Loop(object):
+    def __init__(self, looper, channel):
+        self.looper = looper
+        self.channel = channel
+        self.first_bar = 0
+        self.last_bar = 0
+        self.notes = []
+    def play(self):
+        if self not in self.looper.loops:
+            self.looper.loops.append(self)
+        # FIXME don't do this if other loops are already playing
+        self.looper.tick_zero = self.looper.last_tick+1
+    def stop(self):
+        if self in self.looper.loops:
+            self.looper.loops.remove(self)
+        # FIXME can we find a way to stop the notes that are playing?
+        if self == self.looper.loop_recording:
+            self.looper.loop_recording = None
+        # FIXME do something with self.looper.notes_recording
+    def record(self):
+        self.stop()
+        self.looper.loop_recording = self
+        # FIXME update display too
+
+@persistent_attrs(beats_per_bar=4, loops={})
+class Looper(object):
+
+    Loop = Loop
+
+    def __init__(self, griode):
+        self.griode = griode
+        persistent_attrs_init(self)
+        self.tick_zero = None       # At which tick did we hit "play"?
+        self.last_tick = 0          # Last (=current) tick
+        self.loops_playing = []     # Array of Loop() instances
+        self.loop_recording = None  # Which loop (if any) is recording
+        self.notes_recording = {}   # note -> Note()
+        self.notes_playing = []     # (stop_tick, channel, note)
+
+    def relative_tick(self):
+        return self.last_tick - self.tick_zero
+
+    def input(self, message):
+        if self.loop_recording and message.type=="note_on":
+            if message.channel==self.loop_recording.channel:
+                if message.velocity>0: # beginning of a note
+                    note = Note(message.note, message.velocity,
+                                self.relative_tick, 0)
+                    self.loop_recording.notes.append(note)
+                    self.notes_recording[message.note] = note
+                else: # end of a note
+                    note = self.notes_recording.pop(message.note)
+                    note.duration = self.relative_tick - note.start
+        # No matter what: let the message through the chain
+        self.output(message)
+
+    def tick(self, tick):
+        self.last_tick = tick
+        # First, check if there are notes that should be stopped.
+        notes_to_stop = [note for note in self.notes_playing if note[0]<=tick]
+        for note in notes_to_stop:
+            message = mido.Message(
+                    "note_on", channel=note[1], note=note[2], velocity=0)
+            self.output(message)
+            self.notes_playing.remove(note)
+        # OK now, for each loop that is playing...
+        for loop in self.loops_playing:
+            # Figure out which notes should be started *now*
+            notes_to_play = [note for note in loop.notes
+                             if notes.start==self.relative_tick]
+            # FIXME use first_bar/last_bar
+            # FIXME address looping
+            for note in notes_to_play:
+                self.notes_playing.append(
+                        (tick+note.duration, loop.channel, note.note))
+                message = mido.Message(
+                        "note_on", channel=loop.channel,
+                        note=note.note, velocity=note.velocity)
+                self.output(message)
 
 ##############################################################################
 
