@@ -3,6 +3,12 @@ import mido
 import os
 import subprocess
 
+# When we start the fluidsynth process, we use "MMA" bank select mode.
+# This is the only mode that allows more than 128 banks (since it uses
+# two control change messages to encode the bank number).
+#
+# For more details, see:
+# https://github.com/FluidSynth/fluidsynth/blob/28a794a61cbca3181b21e2781d93c1bffc7c1b97/src/synth/fluid_synth.h#L55
 
 class Instrument(object):
 
@@ -20,7 +26,8 @@ class Instrument(object):
         """Generate MIDI messages to switch to that instrument."""
         # FIXME: deal with font
         return [
-                mido.Message("control_change", control=0, value=self.bank),
+                mido.Message("control_change", control=0, value=self.bank//128),
+                mido.Message("control_change", control=32, value=self.bank%128),
                 mido.Message("program_change", program=self.program),
                 ]
 
@@ -39,6 +46,7 @@ class Fluidsynth(object):
         # Spawn fluidsynth process
         self.fluidsynth = subprocess.Popen(
             ["fluidsynth", "-a", "pulseaudio",
+            "-o", "synth.midi-bank-select=mma",
             "-c", "8", "-p", "griode", default_soundfont],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
             )
