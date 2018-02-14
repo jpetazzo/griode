@@ -10,7 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ArpConfig, ColorPicker, InstrumentPicker, LoopController, NotePicker, ScalePicker
+from gridgets import ArpConfig, ColorPicker, InstrumentPicker, LoopController, Menu, NotePicker, ScalePicker
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 import scales
@@ -54,14 +54,15 @@ class LaunchPad(object):
         self.scalepicker = ScalePicker(self)
         self.arpconfigs = [ArpConfig(self, i) for i in range(16)]
         self.loopcontroller = LoopController(self)
+        self.menu = Menu(self)
         self.grid_in.callback = self.process_message
+        self.focus(self.menu, MENU)
         self.focus(self.notepickers[self.channel])
 
     def focus(self, gridget, leds=None):
         # By default, map the gridget to everything, except MENU
         if leds is None:
-            leds = [led for led in self.surface]
-            #leds = [led for led in self.surface if led not in MENU]
+            leds = [led for led in self.surface if led not in MENU]
         # For each mapped led ...
         for led in leds:
             # Unmap the widget(s) that was "owning" that led

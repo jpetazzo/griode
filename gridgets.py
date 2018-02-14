@@ -108,10 +108,6 @@ class NotePicker(Gridget):
     def __init__(self, grid, channel):
         self.grid = grid
         self.surface = Surface(grid.surface)
-        self.surface["BUTTON_1"] = colors.GREY_LO
-        self.surface["BUTTON_2"] = colors.WHITE
-        self.surface["BUTTON_3"] = colors.GREY_LO
-        self.surface["BUTTON_4"] = colors.GREY_LO
         for button in "UP DOWN LEFT RIGHT".split():
             self.surface[button] = channel_colors[channel]
         self.channel = channel
@@ -175,14 +171,6 @@ class NotePicker(Gridget):
         elif button == "RIGHT":
             self.root += 1
             self.draw()
-        elif button == "BUTTON_1":
-            self.grid.focus(self.grid.loopcontroller)
-        elif button == "BUTTON_2":
-            pass #FIXME we're already in NotePicker so hum... configure it maybe
-        elif button == "BUTTON_3":
-            self.grid.focus(self.grid.instrumentpickers[self.channel])
-        elif button == "BUTTON_4":
-            self.grid.focus(self.grid.arpconfigs[self.channel])
 
     def pad_pressed(self, row, column, velocity):
         note = self.rowcol2note(row, column)
@@ -218,10 +206,6 @@ class InstrumentPicker(Gridget):
         self.grid = grid
         self.channel = channel
         self.surface = Surface(grid.surface)
-        self.surface["BUTTON_1"] = colors.GREY_LO
-        self.surface["BUTTON_2"] = colors.GREY_LO
-        self.surface["BUTTON_3"] = colors.WHITE
-        self.surface["BUTTON_4"] = colors.GREY_LO
         self.surface["UP"] = channel_colors[channel]
         self.surface["DOWN"] = channel_colors[channel]
         if channel>0:
@@ -314,10 +298,6 @@ class InstrumentPicker(Gridget):
         self.draw()
 
     def button_pressed(self, button):
-        if button == "BUTTON_1":
-            self.grid.focus(self.grid.loopcontroller)
-        if button == "BUTTON_2":
-            self.grid.focus(self.grid.notepickers[self.channel])
         if button == "LEFT" and self.channel>0:
             self.grid.channel = self.channel-1
             self.grid.focus(self.grid.instrumentpickers[self.channel-1])
@@ -363,10 +343,6 @@ class ScalePicker(Gridget):
     def __init__(self, grid):
         self.grid = grid
         self.surface = Surface(grid.surface)
-        self.surface["BUTTON_1"] = colors.WHITE
-        self.surface["BUTTON_2"] = colors.GREY_LO
-        self.surface["BUTTON_3"] = colors.GREY_LO
-        self.surface["BUTTON_4"] = colors.GREY_LO
         self.draw()
 
     def draw(self):
@@ -441,12 +417,6 @@ class ScalePicker(Gridget):
             for notepicker in grid.notepickers:
                 notepicker.draw()
 
-    def button_pressed(self, button):
-        if button == "BUTTON_2":
-            self.grid.focus(self.grid.notepickers[self.grid.channel])
-        if button == "BUTTON_3":
-            self.grid.focus(self.grid.instrumentpickers[self.grid.channel])
-
 # Maps notes to a pseudo-piano layout
 # (with black keys on the top row and white keys on the bottom row)
 
@@ -468,10 +438,8 @@ class ArpConfig(Gridget):
         self.display_offset = 0 # Step shown on first column
         self.page = "VELOGATE" # or "MOTIF"
         self.surface = Surface(grid.surface)
-        self.surface["BUTTON_1"] = colors.GREY_LO
-        self.surface["BUTTON_2"] = colors.GREY_LO
-        self.surface["BUTTON_3"] = colors.GREY_LO
-        self.surface["BUTTON_4"] = colors.WHITE
+        self.surface["UP"] = channel_colors[self.channel]
+        self.surface["DOWN"] = channel_colors[self.channel]
         self.surface["LEFT"] = channel_colors[self.channel]
         self.surface["RIGHT"] = channel_colors[self.channel]
         self.draw()
@@ -481,6 +449,10 @@ class ArpConfig(Gridget):
         return self.grid.griode.devicechains[self.channel].arpeggiator
 
     def draw(self):
+        if self.page == "VELOGATE":
+            self.surface["UP"] = colors.PINK_HI
+        else:
+            self.surface["UP"] = channel_colors[self.channel]
         for led in self.surface:
             if isinstance(led, tuple):
                 color = colors.BLACK
@@ -533,13 +505,7 @@ class ArpConfig(Gridget):
         self.draw()
 
     def button_pressed(self, button):
-        if button == "BUTTON_1":
-            self.grid.focus(self.grid.loopcontroller)
-        if button == "BUTTON_2":
-            self.grid.focus(self.grid.notepickers[self.channel])
-        if button == "BUTTON_3":
-            self.grid.focus(self.grid.instrumentpickers[self.channel])
-        if button == "BUTTON_4":
+        if self.page == "VELOGATE" and button == "UP":
             self.arpeggiator.enabled = not self.arpeggiator.enabled
         if button == "LEFT":
             if self.display_offset > 0:
@@ -596,12 +562,6 @@ class LoopController(Gridget):
                 color = colors.GREEN_LO
             self.surface[row, column] = color
 
-    def button_pressed(self, button):
-        if button == "BUTTON_1":
-            self.grid.focus(self.grid.scalepicker)
-        if button == "BUTTON_2":
-            self.grid.focus(self.grid.notepickers[self.grid.channel])
-
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
             return
@@ -610,4 +570,54 @@ class LoopController(Gridget):
             if (line, column) not in self.looper.loops:
                 self.looper.loops[line, column] = self.looper.Loop(self.looper, self.grid.channel)
             self.looper.loops[line, column].record()
+
+##############################################################################
+
+class Menu(Gridget):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.menu = dict(
+                BUTTON_1 = [
+                    self.grid.scalepicker,
+                    self.grid.loopcontroller,
+                ],
+                BUTTON_2 = [
+                    self.grid.notepickers,
+                ],
+                BUTTON_3 = [
+                    self.grid.instrumentpickers,
+                    self.grid.arpconfigs,
+                ],
+                BUTTON_4 = [
+                    self.grid.colorpicker,
+                ],
+            )
+        self.current = "BUTTON_2"
+        self.draw()
+
+    def draw(self):
+        for button in self.menu:
+            if button == self.current:
+                self.surface[button] = colors.PINK_HI
+            else:
+                self.surface[button] = colors.ROSE
+
+    def focus(self, entry):
+        if isinstance(entry, list):
+            gridget = entry[self.grid.channel]
+        else:
+            gridget = entry
+        self.grid.focus(gridget)
+
+    def button_pressed(self, button):
+        if button == self.current:
+            entries = self.menu[button]
+            entries.append(entries.pop(0))
+            self.focus(entries[0])
+        else:
+            self.current = button
+            self.focus(self.menu[button][0])
+        self.draw()
 
