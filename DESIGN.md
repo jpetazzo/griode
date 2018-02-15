@@ -22,28 +22,30 @@ be available for griode to be usable.
 The other buttons will be mapped to arbitrary strings, and can be used
 as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
 
+## Message flow
+
+input → looper → devicechains → arpeggiator → synth
+
+Each "stage" sends messages directly to the next, using the `send()` method.
+
 
 ## Data model
 
 - griode
   - beatclock
   - looper
-    - input()
-    - output()
+    - send(message)
     - tick()
     - beats_per_bar💾
-    - loops[line,column]💾
-      - play()
-      - stop()
-      - record()
-      - channel
-      - first_bar
-      - last_bar
-      - notes[]
+    - loops[line,column]
+      - next_tick
+      - channel💾
+      - first_bar💾
+      - last_bar💾
+      - notes{}💾    } the key is the position the loop (in 24th of qnote)
         - note
         - velocity
-        - start      } these are integer values in ticks
-        - duration   } (so 24 = 1 quarter note)
+        - duration   } this is also in 24th of quarter note
   - synth
     - instruments[]
       - messages()

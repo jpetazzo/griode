@@ -175,9 +175,8 @@ class DeviceChain(object):
         self.channel = channel
         persistent_attrs_init(self, str(channel))
         for message in self.instrument.messages():
-            self.send_to_synth(message)
+            self.griode.synth.send(message.copy(channel=channel))
         self.arpeggiator = Arpeggiator(self)
-        self.arpeggiator.output = self.send_to_synth
 
     # The variables `..._index` indicate which instrument is currently selected.
     # Note: perhaps this instrument does not exist. In that case, the
@@ -191,12 +190,8 @@ class DeviceChain(object):
         instrument = banks.get(self.bank_index, banks[0])
         return instrument
 
-    def send_to_synth(self, message):
-        self.griode.synth.send(message.copy(channel=self.channel))
-
     def send(self, message):
-        message = message.copy(channel=self.channel)
-        self.griode.looper.input(message)
+        self.arpeggiator.send(message)
 
 @persistent_attrs(
         enabled=True, interval=6, pattern_length=4,
@@ -256,7 +251,7 @@ class Arpeggiator(object):
         if self.next_step >= self.pattern_length:
             self.next_step = 0
 
-    def input(self, message):
+    def send(self, message):
         if message.type == "note_on" and self.enabled:
             if message.velocity > 0:
                 if self.notes == []:
@@ -268,6 +263,9 @@ class Arpeggiator(object):
                     self.notes.remove(message.note)
         else:
             self.output(message)
+
+    def output(self, message):
+        self.devicechain.griode.synth.send(message)
 
 ##############################################################################
 
@@ -340,7 +338,7 @@ class Looper(object):
         self.notes_recording = {}    # note -> (Note(), tick_when_started)
         self.notes_playing = []      # (stop_tick, channel, note)
 
-    def input(self, message):
+    def send(self, message):
         if self.playing and message.type=="note_on":
             #import pdb;pdb.set_trace()
             for loop in self.loops_recording:
@@ -362,7 +360,7 @@ class Looper(object):
     def output(self, message):
         channel = message.channel
         devicechain = self.griode.devicechains[channel]
-        devicechain.arpeggiator.input(message)
+        devicechain.send(message)
 
     def tick(self, tick):
         self.last_tick = tick

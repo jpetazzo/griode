@@ -179,8 +179,10 @@ class NotePicker(Gridget):
         if velocity > 0:
             velocity = 63 + velocity//2
         # Send that note to the right devicechain
-        message = mido.Message("note_on", note=note, velocity=velocity)
-        self.grid.griode.devicechains[self.channel].send(message)
+        message = mido.Message(
+                "note_on", channel=self.channel,
+                note=note, velocity=velocity)
+        self.grid.griode.looper.send(message)
         # Then light up all instrumentpickers
         for grid in self.grid.griode.grids:
             picker = grid.notepickers[self.channel]
