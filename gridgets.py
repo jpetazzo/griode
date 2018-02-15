@@ -591,7 +591,8 @@ class LoopController(Gridget):
         if self.mode == "REC":
             # If we tapped an empty cell, create a new loop
             if (row, column) not in self.looper.loops:
-                loop = self.looper.Loop(self.looper, self.grid.channel)
+                loop = self.looper.Loop(self.looper, (row, column))
+                loop.channel = self.grid.channel
                 self.looper.loops[row, column] = loop
             else:
                 loop = self.looper.loops[row, column]

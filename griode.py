@@ -313,17 +313,16 @@ class Note(object):
         self.velocity = velocity
         self.duration = duration
 
+@persistent_attrs(notes={}, channel=0, first_bar=0, last_bar=0)
 class Loop(object):
-    def __init__(self, looper, channel):
+    def __init__(self, looper, cell):
         logging.info("Loop.__init__()")
         self.looper = looper
-        self.channel = channel
-        self.first_bar = 0
-        self.last_bar = 0
-        self.notes = {} # ticknum -> [notes]
+        persistent_attrs_init(self, "{},{}".format(*cell))
         self.next_tick = 0 # next "position" to be played in self.notes
+        self.looper.looprefs.add(cell)
 
-@persistent_attrs(beats_per_bar=4, loops={})
+@persistent_attrs(beats_per_bar=4, looprefs=set())
 class Looper(object):
 
     Loop = Loop
@@ -337,6 +336,9 @@ class Looper(object):
         self.loops_recording = set() # Also instances of Loop
         self.notes_recording = {}    # note -> (Note(), tick_when_started)
         self.notes_playing = []      # (stop_tick, channel, note)
+        self.loops = {}
+        for cell in self.looprefs:
+            self.loops[cell] = Loop(self, cell)
 
     def send(self, message):
         if self.playing and message.type=="note_on":
