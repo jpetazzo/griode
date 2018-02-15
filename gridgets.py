@@ -529,6 +529,7 @@ class LoopController(Gridget):
     def __init__(self, grid):
         self.grid = grid
         self.surface = Surface(grid.surface)
+        self.mode = "REC" # or "PLAY"
         self.draw()
 
     @property
@@ -538,18 +539,30 @@ class LoopController(Gridget):
     def draw(self):
         for led in self.surface:
             if isinstance(led, tuple):
-                row, column = led
-                color = colors.BLACK
-                if row in [1, 2, 3, 4]: # loops
-                    line = 5-row
-                    loop = self.grid.griode.looper.loops.get((line, column))
-                    if loop:
-                        color = channel_colors[loop.channel]
-                    else:
-                        color = colors.GREY_LO
+                color = colors.GREY_LO
+                if led in self.looper.loops:
+                    color = colors.ROSE
+                    loop = self.looper.loops[led]
+                    if self.mode == "PLAY" and loop in self.looper.loops_playing:
+                        self.color = colors.PINK_HI
+                    if self.mode == "REC" and loop in self.looper.loops_recording:
+                        self.color = colors.PINK_HI
                 self.surface[led] = color
+        # UP = playback, DOWN = record
+        if self.mode == "REC":
+            self.surface["UP"] = colors.ROSE
+            self.surface["DOWN"] = colors.PINK_HI
+        else:
+            self.surface["UP"] = colors.PINK_HI
+            self.surface["DOWN"] = colors.ROSE
+        # LEFT = rewind all loops (but keep playing if we're playing)
+        self.surface["LEFT"] = colors.ROSE
+        # RIGHT = play/pause
+        self.surface["RIGHT"] = colors.PINK_HI if self.looper.playing else colors.ROSE
 
     def tick(self, tick):
+        return
+        # FIXME
         absolute_beat = tick//24
         beats_per_bar = self.looper.beats_per_bar
         beat_in_bar = absolute_beat%beats_per_bar
@@ -565,11 +578,42 @@ class LoopController(Gridget):
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
             return
-        if row in [1, 2, 3, 4]:
-            line = 5-row
-            if (line, column) not in self.looper.loops:
-                self.looper.loops[line, column] = self.looper.Loop(self.looper, self.grid.channel)
-            self.looper.loops[line, column].record()
+        if self.mode == "PLAY":
+            # Did we tap a loop that actually exists?
+            loop = self.looper.loops.get((row, column))
+            if loop:
+                if loop in self.looper.loops_playing:
+                    self.looper.loops_playing.remove(loop)
+                else:
+                    self.looper.loops_playing.add(loop)
+        if self.mode == "REC":
+            # If we tapped an empty cell, create a new loop
+            if (row, column) not in self.looper.loops:
+                loop = self.looper.Loop(self.looper, self.grid.channel)
+                self.looper.loops[row, column] = loop
+            else:
+                loop = self.looper.loops[row, column]
+            if loop in self.looper.loops_recording:
+                self.looper.loops_recording.remove(loop)
+            else:
+                self.looper.loops_recording.add(loop)
+                # FIXME: stop recording other loops on the same channel
+        self.draw() #FIXME this should be in the Loop() logic
+
+    def button_pressed(self, button):
+        if button == "UP":
+            self.mode = "PLAY"
+        if button == "DOWN":
+            self.mode = "REC"
+        if button == "LEFT":
+            for loop in self.looper.loops_playing:
+                loop.next_tick = 0
+            for loop in self.looper.loops_recording:
+                loop.next_tick = 0
+            # FIXME should we also undo the last recording?
+        if button == "RIGHT":
+            self.looper.playing = not self.looper.playing
+        self.draw() #FIXME this should be in the Loop() logic
 
 ##############################################################################
 
@@ -580,8 +624,8 @@ class Menu(Gridget):
         self.surface = Surface(grid.surface)
         self.menu = dict(
                 BUTTON_1 = [
-                    self.grid.scalepicker,
                     self.grid.loopcontroller,
+                    self.grid.scalepicker,
                 ],
                 BUTTON_2 = [
                     self.grid.notepickers,

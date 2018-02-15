@@ -195,7 +195,8 @@ class DeviceChain(object):
         self.griode.synth.send(message.copy(channel=self.channel))
 
     def send(self, message):
-        self.arpeggiator.input(message)
+        message = message.copy(channel=self.channel)
+        self.griode.looper.input(message)
 
 @persistent_attrs(
         enabled=True, interval=6, pattern_length=4,
@@ -284,6 +285,7 @@ class BeatClock(object):
             devicechain.arpeggiator.tick(self.tick)
         for grid in self.griode.grids:
             grid.loopcontroller.tick(self.tick)
+        self.griode.looper.tick(self.tick)
 
     def poll(self):
         now = time.time()
@@ -308,35 +310,20 @@ class BeatClock(object):
 ##############################################################################
 
 class Note(object):
-    def __init__(self, note, velocity, start, duration):
+    def __init__(self, note, velocity, duration):
         self.note = note
         self.velocity = velocity
-        self.start = start
         self.duration = duration
 
 class Loop(object):
     def __init__(self, looper, channel):
+        logging.info("Loop.__init__()")
         self.looper = looper
         self.channel = channel
         self.first_bar = 0
         self.last_bar = 0
-        self.notes = []
-    def play(self):
-        if self not in self.looper.loops:
-            self.looper.loops.append(self)
-        # FIXME don't do this if other loops are already playing
-        self.looper.tick_zero = self.looper.last_tick+1
-    def stop(self):
-        if self in self.looper.loops:
-            self.looper.loops.remove(self)
-        # FIXME can we find a way to stop the notes that are playing?
-        if self == self.looper.loop_recording:
-            self.looper.loop_recording = None
-        # FIXME do something with self.looper.notes_recording
-    def record(self):
-        self.stop()
-        self.looper.loop_recording = self
-        # FIXME update display too
+        self.notes = {} # ticknum -> [notes]
+        self.next_tick = 0 # next "position" to be played in self.notes
 
 @persistent_attrs(beats_per_bar=4, loops={})
 class Looper(object):
@@ -346,29 +333,36 @@ class Looper(object):
     def __init__(self, griode):
         self.griode = griode
         persistent_attrs_init(self)
-        self.tick_zero = None       # At which tick did we hit "play"?
-        self.last_tick = 0          # Last (=current) tick
-        self.loops_playing = []     # Array of Loop() instances
-        self.loop_recording = None  # Which loop (if any) is recording
-        self.notes_recording = {}   # note -> Note()
-        self.notes_playing = []     # (stop_tick, channel, note)
-
-    def relative_tick(self):
-        return self.last_tick - self.tick_zero
+        self.playing = False
+        self.last_tick = 0           # Last (=current) tick
+        self.loops_playing = set()   # Contains instances of Loop
+        self.loops_recording = set() # Also instances of Loop
+        self.notes_recording = {}    # note -> (Note(), tick_when_started)
+        self.notes_playing = []      # (stop_tick, channel, note)
 
     def input(self, message):
-        if self.loop_recording and message.type=="note_on":
-            if message.channel==self.loop_recording.channel:
-                if message.velocity>0: # beginning of a note
-                    note = Note(message.note, message.velocity,
-                                self.relative_tick, 0)
-                    self.loop_recording.notes.append(note)
-                    self.notes_recording[message.note] = note
-                else: # end of a note
-                    note = self.notes_recording.pop(message.note)
-                    note.duration = self.relative_tick - note.start
+        if self.playing and message.type=="note_on":
+            #import pdb;pdb.set_trace()
+            for loop in self.loops_recording:
+                if loop.channel == message.channel:
+                    if message.velocity>0: # beginning of a note
+                        logging.debug("Recording new note START")
+                        note = Note(message.note, message.velocity, 0)
+                        if loop.next_tick not in loop.notes:
+                            loop.notes[loop.next_tick] = []
+                        loop.notes[loop.next_tick].append(note)
+                        self.notes_recording[message.note] = (note, self.last_tick)
+                    else: # end of a note
+                        logging.debug("Recording new note END")
+                        note, tick_started = self.notes_recording.pop(message.note)
+                        note.duration = tick_started - self.last_tick
         # No matter what: let the message through the chain
         self.output(message)
+
+    def output(self, message):
+        channel = message.channel
+        devicechain = self.griode.devicechains[channel]
+        devicechain.arpeggiator.input(message)
 
     def tick(self, tick):
         self.last_tick = tick
@@ -379,27 +373,34 @@ class Looper(object):
                     "note_on", channel=note[1], note=note[2], velocity=0)
             self.output(message)
             self.notes_playing.remove(note)
+        # Only play stuff if we are really playing (i.e. not paused)
+        if not self.playing:
+            return
         # OK now, for each loop that is playing...
         for loop in self.loops_playing:
             # Figure out which notes should be started *now*
-            notes_to_play = [note for note in loop.notes
-                             if notes.start==self.relative_tick]
-            # FIXME use first_bar/last_bar
-            # FIXME address looping
-            for note in notes_to_play:
+            for note in loop.notes.get(loop.next_tick, []):
                 self.notes_playing.append(
                         (tick+note.duration, loop.channel, note.note))
                 message = mido.Message(
                         "note_on", channel=loop.channel,
                         note=note.note, velocity=note.velocity)
                 self.output(message)
+        # Advance each loop that is currently playing or recording
+        for loop in self.loops_playing | self.loops_recording:
+            loop.next_tick += 1
 
 ##############################################################################
 
 def main():
     griode = Griode()
-    while True:
-        griode.beatclock.once()
+    try:
+        while True:
+            griode.beatclock.once()
+    except KeyboardInterrupt:
+        for grid in griode.grids:
+            for led in grid.surface:
+                grid.surface[led] = colors.PINK if led==(1,1) else colors.BLACK
 
 
 if __name__ == "__main__":
