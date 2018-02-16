@@ -265,6 +265,7 @@ class Arpeggiator(object):
             self.output(message)
 
     def output(self, message):
+        message = message.copy(channel = self.devicechain.channel)
         self.devicechain.griode.synth.send(message)
 
 ##############################################################################
@@ -355,7 +356,7 @@ class Looper(object):
                     else: # end of a note
                         logging.debug("Recording new note END")
                         note, tick_started = self.notes_recording.pop(message.note)
-                        note.duration = tick_started - self.last_tick
+                        note.duration = self.last_tick - tick_started
         # No matter what: let the message through the chain
         self.output(message)
 

@@ -543,12 +543,15 @@ class LoopController(Gridget):
             if isinstance(led, tuple):
                 color = colors.GREY_LO
                 if led in self.looper.loops:
-                    color = colors.ROSE
+                    # If there is a loop in that cell, light it up
                     loop = self.looper.loops[led]
+                    color = channel_colors[loop.channel]
+                    # If that loop is selected for play or rec, show it
+                    # FIXME: use fancy blinking instead
                     if self.mode == "PLAY" and loop in self.looper.loops_playing:
-                        self.color = colors.PINK_HI
+                        color = colors.PINK_HI
                     if self.mode == "REC" and loop in self.looper.loops_recording:
-                        self.color = colors.PINK_HI
+                        color = colors.PINK_HI
                 self.surface[led] = color
         # UP = playback, DOWN = record
         if self.mode == "REC":
@@ -601,7 +604,9 @@ class LoopController(Gridget):
             else:
                 self.looper.loops_recording.add(loop)
                 # FIXME: stop recording other loops on the same channel
-        self.draw() #FIXME this should be in the Loop() logic
+        # Update all loopcontrollers to show new state
+        for grid in self.grid.griode.grids:
+            grid.loopcontroller.draw()
 
     def button_pressed(self, button):
         if button == "UP":
