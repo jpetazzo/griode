@@ -33,6 +33,8 @@ class Griode(object):
                 self.grids.append(LaunchpadPro(self, port_name))
             if "Launchpad MK2" in port_name:
                 self.grids.append(LaunchpadMK2(self, port_name))
+            if "Launchpad S" in port_name:
+                self.grids.append(LaunchpadS(self, port_name))
 
 @persistent_attrs(channel=0)
 class LaunchPad(object):
@@ -166,6 +168,23 @@ class LaunchpadMK2(LaunchPad):
 
     setup = []
 
+
+class LaunchpadS(LaunchPad):
+
+    message2led = {}
+    led2message = {}
+
+    for row in range(1,9):
+        for column in range(1,9):
+            note = 16*(8-row) + column-1
+            message2led["NOTE", note] = row, column
+            led2message[row, column] = "NOTE", note
+    for i,button in enumerate("UP DOWN LEFT RIGHT BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()):
+        control = 104 + i
+        message2led["CC", control] = button
+        led2message[button] = "CC", control
+
+    setup = []
 
 @persistent_attrs(font_index=0, group_index=0, instr_index=0, bank_index=0)
 class DeviceChain(object):
