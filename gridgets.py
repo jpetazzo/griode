@@ -538,6 +538,28 @@ class LoopController(Gridget):
     def looper(self):
         return self.grid.griode.looper
 
+    def blink(self, color, play, rec):
+        tick = self.looper.last_tick
+        # If play: slow blink (once per quarter note)
+        # If rec: fast blink (twice per quarter note)
+        # If play and rec: alternate slow and fast blink
+        if play and rec:
+            if tick%48 > 24:
+                rec=False
+            else:
+                play=False
+        if play:
+            if tick%24 > 18:
+                return colors.BLACK
+            else:
+                return color
+        if rec:
+            if tick%12 > 4:
+                return colors.BLACK
+            else:
+                return color
+        return color
+
     def draw(self):
         for led in self.surface:
             if isinstance(led, tuple):
@@ -547,11 +569,12 @@ class LoopController(Gridget):
                     loop = self.looper.loops[led]
                     color = channel_colors[loop.channel]
                     # If that loop is selected for play or rec, show it
-                    # FIXME: use fancy blinking instead
-                    if self.mode == "PLAY" and loop in self.looper.loops_playing:
-                        color = colors.PINK_HI
-                    if self.mode == "REC" and loop in self.looper.loops_recording:
-                        color = colors.PINK_HI
+                    # (With fancy blinking)
+                    tick = self.grid.griode.looper.last_tick
+                    color = self.blink(
+                            color,
+                            loop in self.looper.loops_playing,
+                            loop in self.looper.loops_recording)
                 self.surface[led] = color
         # UP = playback, DOWN = record
         if self.mode == "REC":
@@ -560,25 +583,17 @@ class LoopController(Gridget):
         else:
             self.surface["UP"] = colors.PINK_HI
             self.surface["DOWN"] = colors.ROSE
+        self.surface["UP"] = self.blink(
+                self.surface["UP"], self.looper.loops_playing, False)
+        self.surface["DOWN"] = self.blink(
+                self.surface["DOWN"], False, self.looper.loops_recording)
         # LEFT = rewind all loops (but keep playing if we're playing)
         self.surface["LEFT"] = colors.ROSE
         # RIGHT = play/pause
         self.surface["RIGHT"] = colors.PINK_HI if self.looper.playing else colors.ROSE
 
     def tick(self, tick):
-        return
-        # FIXME
-        absolute_beat = tick//24
-        beats_per_bar = self.looper.beats_per_bar
-        beat_in_bar = absolute_beat%beats_per_bar
-        row = 8
-        for column in range(1,9): #FIXME
-            color = colors.BLACK
-            if beat_in_bar+1 == column:
-                color = colors.GREEN_HI
-            elif column <= beats_per_bar:
-                color = colors.GREEN_LO
-            self.surface[row, column] = color
+        self.draw()
 
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
