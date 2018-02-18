@@ -725,7 +725,8 @@ class LoopController(Gridget):
         self.surface["DOWN"] = self.blink(
                 self.surface["DOWN"], False, self.looper.loops_recording)
         # LEFT = rewind all loops (but keep playing if we're playing)
-        self.surface["LEFT"] = colors.ROSE
+        # (but also used to delete a loop!)
+        self.surface["LEFT"] = colors.PINK_HI if self.pads_held else colors.ROSE
         # RIGHT = play/pause
         self.surface["RIGHT"] = colors.PINK_HI if self.looper.playing else colors.ROSE
 
@@ -784,11 +785,27 @@ class LoopController(Gridget):
         if button == "DOWN":
             self.mode = "REC"
         if button == "LEFT":
-            for loop in self.looper.loops_playing:
-                loop.next_tick = loop.tick_in
-            for loop in self.looper.loops_recording:
-                loop.next_tick = loop.tick_in
-            # FIXME should we also undo the last recording?
+            if self.pads_held:
+                # Delete!
+                for cell in self.pads_held:
+                    loop = self.looper.loops.get(cell)
+                    if not loop: continue
+                    # OK this is hackish, but because of the persistence system,
+                    # we need to re-initialize the Loop object internal fields.
+                    loop.tick_in = loop.tick_out = 0
+                    loop.notes.clear()
+                    self.looper.loops_playing.discard(loop)
+                    self.looper.loops_recording.discard(loop)
+                    self.looper.looprefs.discard(cell)
+                    del self.looper.loops[cell]
+                self.pads_held.clear()
+            else:
+                # Rewind
+                for loop in self.looper.loops_playing:
+                    loop.next_tick = loop.tick_in
+                for loop in self.looper.loops_recording:
+                    loop.next_tick = loop.tick_in
+                # FIXME should we also undo the last recording?
         if button == "RIGHT":
             # I'm not sure that this logic should be here,
             # but it should be somewhere, so here we go...
