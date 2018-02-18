@@ -103,6 +103,54 @@ class ColorPicker(Gridget):
 
 ##############################################################################
 
+class DrumPicker(Gridget):
+
+    # There are some interesting layouts there:
+    FOUR_FOUR_MAP = [
+            [55, 49, 56, 57],
+            [41, 43, 47, 50],
+            [40, 38, 46, 53],
+            [37, 36, 42, 51],
+            ][::-1]
+    FOUR_EIGHT_MAP = [
+            [49, 57, 55, 52, 53, 59, 51, None],
+            [50, 48, 47, 45, 43, 41, None, 46],
+            [40, 38, 37, None, 39, 54, None, 42],
+            [36, 35, None, None, 75, 56, None, 44],
+            ][::-1]
+
+    def __init__(self, grid, channel):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.channel = channel
+        self.map = self.FOUR_EIGHT_MAP
+        self.draw()
+
+    def rc2note(self, row, column):
+        try:
+            return self.map[row-1][column-1]
+        except IndexError:
+            return None
+
+    def draw(self):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                if self.rc2note(row, column):
+                    self.surface[led] = channel_colors[self.channel]
+
+    def pad_pressed(self, row, column, velocity):
+        note = self.rc2note(row, column)
+        if not note:
+            return
+        message = mido.Message(
+                "note_on", channel=self.channel,
+                note=note, velocity=velocity)
+        self.grid.griode.looper.send(message)
+        self.surface[row, column] = colors.PINK_HI if velocity>0 else channel_colors[self.channel]
+
+##############################################################################
+
 @persistent_attrs(shift=5, root=48)
 class NotePicker(Gridget):
 
@@ -179,7 +227,7 @@ class NotePicker(Gridget):
         # FIXME this probably should be moved to the devicechains
         if velocity > 0:
             velocity = 63 + velocity//2
-        # Send that note to the right devicechain
+        # Send that note to the message chain
         message = mido.Message(
                 "note_on", channel=self.channel,
                 note=note, velocity=velocity)
@@ -770,6 +818,7 @@ class Menu(Gridget):
                 ],
                 BUTTON_2 = [
                     self.grid.notepickers,
+                    self.grid.drumpickers,
                 ],
                 BUTTON_3 = [
                     self.grid.instrumentpickers,

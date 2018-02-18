@@ -10,7 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ArpConfig, ColorPicker, InstrumentPicker, LoopController, Menu, NotePicker, ScalePicker
+from gridgets import ArpConfig, ColorPicker, DrumPicker, InstrumentPicker, LoopController, Menu, NotePicker, ScalePicker
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 import scales
@@ -51,6 +51,7 @@ class LaunchPad(object):
         self.surface = LPSurface(self)
         self.surface_map = dict() # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
+        self.drumpickers = [DrumPicker(self, i) for i in range(16)]
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)
@@ -79,6 +80,11 @@ class LaunchPad(object):
 
     def process_message(self, message):
         logging.debug("{} got message {}".format(self, message))
+
+        # OK this is a hack to use fluidsynth directly with the Launchpad Pro
+        if getattr(message, "channel", None) == 8:
+            self.griode.synth.send(message)
+            return
 
         # Ignore aftertouch messages for now
         if message.type == "polytouch":
