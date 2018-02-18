@@ -399,6 +399,9 @@ class Looper(object):
                     "note_on", channel=note[1], note=note[2], velocity=0)
             self.output(message)
             self.notes_playing.remove(note)
+            # Light off notepickers
+            for grid in self.griode.grids:
+                grid.notepickers[note[1]].send(message, self)
         # Only play stuff if we are really playing (i.e. not paused)
         if not self.playing:
             return
@@ -412,6 +415,9 @@ class Looper(object):
                         "note_on", channel=loop.channel,
                         note=note.note, velocity=note.velocity)
                 self.output(message)
+                # Light up notepickers
+                for grid in self.griode.grids:
+                    grid.notepickers[loop.channel].send(message, self)
         # Advance each loop that is currently playing or recording
         for loop in self.loops_playing | self.loops_recording:
             loop.next_tick += 1
