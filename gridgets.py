@@ -1,11 +1,12 @@
 import logging
 import mido
+import shelve
+import time
 
 import colors
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 import scales
-import shelve
 
 ##############################################################################
 
@@ -526,12 +527,100 @@ class ArpConfig(Gridget):
 
 ##############################################################################
 
-class LoopController(Gridget):
+class LoopEditor(Gridget):
 
     def __init__(self, grid):
         self.grid = grid
         self.surface = Surface(grid.surface)
+        self.loop = None
+        self.ticks_per_cell = 12
+        self.action = None
+
+    def edit(self, loop):
+        self.loop = loop
+        self.draw()
+
+    def rc2cell(self, row, column):
+        # Map row,column to a cell number (starting at zero)
+        return (8-row)*8 + column-1
+
+    def rc2ticks(self, row, column):
+        # Return list of ticks in a given cell
+        cell = self.rc2cell(row, column)
+        return range(cell*self.ticks_per_cell, (cell+1)*self.ticks_per_cell)
+
+    def draw(self):
+        if self.loop is None:
+            return
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                color = colors.BLACK
+                ticks = self.rc2ticks(row, column)
+                for tick in ticks:
+                    if tick in self.loop.notes:
+                        color = colors.GREY_LO
+                if self.loop.looper.playing:
+                    if self.loop in (self.loop.looper.loops_playing | self.loop.looper.loops_recording):
+                        if self.loop.next_tick in ticks:
+                            color = channel_colors[self.loop.channel]
+                if self.loop.tick_in in ticks:
+                    color = colors.PINK_HI
+                if self.loop.tick_out in ticks:
+                    color = colors.PINK_HI
+                self.surface[led] = color
+
+    def pad_pressed(self, row, column, velocity):
+        if velocity==0:
+            return
+        if self.action == "SET_TICK_IN":
+            tick = self.rc2ticks(row, column)[0]
+            logging.info("Moving tick_in for loop {} to {}".format(self.loop, tick))
+            self.loop.tick_in = tick
+            self.action = None
+        elif self.action == "SET_TICK_OUT":
+            tick = self.rc2ticks(row, column)[-1] + 1
+            logging.info("Moving tick_out for loop {} to {}".format(self.loop, tick))
+            self.loop.tick_out = tick
+            self.action = None
+        else:
+            ticks = self.rc2ticks(row, column)
+            if self.loop.tick_out in ticks:
+                logging.info("Action is now SET_TICK_OUT")
+                self.action = "SET_TICK_OUT"
+            elif self.loop.tick_in in ticks:
+                logging.info("Action is now SET_TICK_IN")
+                self.action = "SET_TICK_IN"
+            else:
+                for tick in ticks:
+                    for note in self.loop.notes.get(tick, []):
+                        # FIXME: note_on when pad is pressed, note_off when released
+                        message = mido.Message(
+                                "note_on", channel=self.loop.channel,
+                                note=note.note, velocity=note.velocity)
+                        self.grid.griode.synth.send(message)
+                        self.grid.griode.synth.send(message.copy(velocity=0))
+        self.draw()
+
+
+##############################################################################
+
+class LoopController(Gridget):
+
+    """
+    ^ v < >  = PLAY REC REWIND PLAY/PAUSE
+    Then the 64 pads are available for loops
+
+    Press more than 1 second on a pad to edit it
+    Press less than 1 second to select/deselect it for play/rec
+    """
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.loopeditor = LoopEditor(grid)
         self.mode = "REC" # or "PLAY"
+        self.pads_held = {} # maps pad to time when pressed
         self.draw()
 
     @property
@@ -593,11 +682,29 @@ class LoopController(Gridget):
         self.surface["RIGHT"] = colors.PINK_HI if self.looper.playing else colors.ROSE
 
     def tick(self, tick):
+        for cell, time_pressed in self.pads_held.items():
+            if time.time() > time_pressed + 1.0:
+                self.pads_held.clear()
+                # Enter edit mode for that pad
+                loop = self.looper.loops[cell]
+                self.loopeditor.edit(loop)
+                self.grid.focus(self.loopeditor)
+                break
         self.draw()
+        self.loopeditor.draw()
 
     def pad_pressed(self, row, column, velocity):
-        if velocity == 0:
+        # We don't act when the pad is pressed, but when it is released.
+        # (When the pad is pressed, we record the time, so we can later
+        # detect when a pad is held more than 1s to enter edit mode.)
+        if velocity > 0:
+            self.pads_held[row, column] = time.time()
             return
+        # When pad is released, if "something" removed it from the
+        # pads_held dict, ignore the action.
+        if (row, column) not in self.pads_held:
+            return
+        del self.pads_held[row, column]
         if self.mode == "PLAY":
             # Did we tap a loop that actually exists?
             loop = self.looper.loops.get((row, column))
@@ -630,13 +737,24 @@ class LoopController(Gridget):
             self.mode = "REC"
         if button == "LEFT":
             for loop in self.looper.loops_playing:
-                loop.next_tick = 0
+                loop.next_tick = loop.tick_in
             for loop in self.looper.loops_recording:
-                loop.next_tick = 0
+                loop.next_tick = loop.tick_in
             # FIXME should we also undo the last recording?
         if button == "RIGHT":
+            # I'm not sure that this logic should be here,
+            # but it should be somewhere, so here we go...
+            # When stopping, if any loop doesn't have a
+            # tick_out point, add one. (By rounding up to
+            # the end of the bar.)
+            if self.looper.playing:
+                for loop in self.looper.loops_recording:
+                    if loop.tick_out == 0:
+                        loop.tick_out = 24 * ((loop.tick_out+23) // 24)
+            # And then toggle the playing flag.
             self.looper.playing = not self.looper.playing
-        self.draw() #FIXME this should be in the Loop() logic
+        for grid in self.grid.griode.grids:
+            grid.loopcontroller.draw()
 
 ##############################################################################
 

@@ -40,8 +40,8 @@ Each "stage" sends messages directly to the next, using the `send()` method.
     - loops[line,column]
       - next_tick
       - channel💾
-      - first_bar💾
-      - last_bar💾
+      - tick_in💾    } beginning of the loop
+      - tick_out💾   } when reaching that tick, rewind to tick_in
       - notes{}💾    } the key is the position the loop (in 24th of qnote)
         - note
         - velocity

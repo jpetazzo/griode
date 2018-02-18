@@ -333,7 +333,7 @@ class Note(object):
         self.velocity = velocity
         self.duration = duration
 
-@persistent_attrs(notes={}, channel=0, first_bar=0, last_bar=0)
+@persistent_attrs(notes={}, channel=0, tick_in=0, tick_out=0)
 class Loop(object):
     def __init__(self, looper, cell):
         logging.info("Loop.__init__()")
@@ -409,6 +409,9 @@ class Looper(object):
         # Advance each loop that is currently playing or recording
         for loop in self.loops_playing | self.loops_recording:
             loop.next_tick += 1
+            # If we're past the end of the loop, jump to begin of loop
+            if loop.tick_out > 0 and loop.next_tick >= loop.tick_out:
+                loop.next_tick = loop.tick_in
 
 ##############################################################################
 
