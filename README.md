@@ -2,6 +2,8 @@
 
 Griode lets you play music using a LaunchPad or a similar controller.
 
+For short demos and tutorials, check this [YouTube playlist](https://www.youtube.com/playlist?list=PLBAFXs0YjviK9PzKnr3MDsRU6YAJgeH1K).
+
 
 ## Installation and requirements
 
