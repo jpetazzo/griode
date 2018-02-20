@@ -151,7 +151,7 @@ class DrumPicker(Gridget):
 
 ##############################################################################
 
-@persistent_attrs(shift=5, root=48)
+@persistent_attrs(root=48, mapping="CHROMATIC")
 class NotePicker(Gridget):
 
     def __init__(self, grid, channel):
@@ -161,7 +161,9 @@ class NotePicker(Gridget):
             self.surface[button] = channel_colors[channel]
         self.channel = channel
         persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
-        self.draw()
+        self.led2note = {}
+        self.note2leds = {}
+        self.switch()
 
     @property
     def key(self):
@@ -171,21 +173,37 @@ class NotePicker(Gridget):
     def scale(self):
         return self.grid.griode.scale
 
-    def rowcol2note(self, row, column):
-        note = self.root + (column-1) + self.shift*(row-1)
-        return note
-
-    def note2rowcols(self, note):
-        # Convert actual note into a list of row+col positions
-        # (There can be more than one)
-        rowcols = []
-        # For each row, check on which column the note would fall
-        # If it falls within [1..8] keep it in the set
-        for row in range(8):
-            column = note - self.root - self.shift*row
-            if column>=0 and column<=7:
-                rowcols = rowcols + [(row+1, column+1)]
-        return rowcols
+    def switch(self, mapping=None):
+        logging.info("NotePicker.switch({})".format(mapping))
+        if mapping is None:
+            mapping = self.mapping
+        else:
+            self.mapping = mapping
+        self.led2note.clear()
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                if mapping == "CHROMATIC":
+                    shift = 5
+                    note = shift*(row-1) + (column-1)
+                    note += self.root
+                elif mapping == "DIATONIC":
+                    shift = 3
+                    note = shift*(row-1) + (column-1)
+                    octave = note//len(self.scale)
+                    step = note%len(self.scale)
+                    note = self.root + 12*octave + self.scale[step]
+                elif mapping == "MAGIC":
+                    note = (column-1)*7 - (column-1)//2*12
+                    note += (row-1)*4
+                    note += self.root
+                self.led2note[led] = note
+        self.note2leds.clear()
+        for led,note in self.led2note.items():
+            if note not in self.note2leds:
+                self.note2leds[note] = []
+            self.note2leds[note].append(led)
+        self.draw()
 
     def is_key(self, note):
         return note%12 == self.key%12
@@ -203,9 +221,8 @@ class NotePicker(Gridget):
 
     def draw(self):
         for led in self.surface:
-            if isinstance(led, tuple):
-                row, column = led
-                note = self.rowcol2note(row, column)
+            if led in self.led2note:
+                note = self.led2note[led]
                 color = self.note2color(note)
                 self.surface[led] = color
 
@@ -216,13 +233,16 @@ class NotePicker(Gridget):
             self.root -= 12
         elif button == "LEFT":
             self.root -= 1
-            self.draw()
         elif button == "RIGHT":
             self.root += 1
-            self.draw()
+        self.switch()
+        # FIXME in diatonic mode, we want to make sure that
+        # the root is in the scale.
+        # FIXME also there might be something special to do
+        # for the magic tone network mode.
 
     def pad_pressed(self, row, column, velocity):
-        note = self.rowcol2note(row, column)
+        note = self.led2note[row, column]
         # Velocity curve (this is kind of a hack for now)
         # FIXME this probably should be moved to the devicechains
         if velocity > 0:
@@ -245,7 +265,7 @@ class NotePicker(Gridget):
                 color = colors.RED
             else:
                 color = colors.AMBER
-            leds = self.note2rowcols(message.note)
+            leds = self.note2leds[message.note]
             for led in leds:
                 self.surface[led] = color
 
@@ -834,7 +854,9 @@ class Menu(Gridget):
                     self.grid.scalepicker,
                 ],
                 BUTTON_2 = [
-                    self.grid.notepickers,
+                    "CHROMATIC",
+                    "DIATONIC",
+                    "MAGIC",
                     self.grid.drumpickers,
                 ],
                 BUTTON_3 = [
@@ -856,11 +878,17 @@ class Menu(Gridget):
                 self.surface[button] = colors.ROSE
 
     def focus(self, entry):
+        mode = None
+        if isinstance(entry, str):
+            mode = entry
+            entry = self.grid.notepickers
         if isinstance(entry, list):
             gridget = entry[self.grid.channel]
         else:
             gridget = entry
         self.grid.focus(gridget)
+        if mode:
+            gridget.switch(mode)
 
     def button_pressed(self, button):
         if button == self.current:
