@@ -874,6 +874,7 @@ class Menu(Gridget):
                 ],
                 BUTTON_4 = [
                     self.grid.colorpicker,
+                    self.grid.mixer,
                 ],
             )
         self.current = "BUTTON_2"
@@ -907,5 +908,41 @@ class Menu(Gridget):
         else:
             self.current = button
             self.focus(self.menu[button][0])
+        self.draw()
+
+##############################################################################
+
+class Mixer(Gridget):
+    # FIXME this only allows to view/set 8 channels for now
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        # FIXME the volumes probably should be stored somewhere else
+        self.volumes = [96]*16
+        self.draw()
+
+    def draw(self):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                color = colors.BLACK
+                volume = self.volumes[column-1]
+                n_leds = (volume+16)//16
+                if row <= n_leds:
+                    color = channel_colors[column-1]
+                self.surface[led] = color
+
+    def pad_pressed(self, row, column, velocity):
+        if velocity == 0:
+            return
+        channel = column-1
+        volume = 127*(row-1)//7
+        self.volumes[channel] = volume
+        logging.info("Setting channel {} volume to {}".format(channel, volume))
+        message = mido.Message(
+                "control_change", channel=channel,
+                control=7, value=volume)
+        self.grid.griode.synth.send(message)
         self.draw()
 

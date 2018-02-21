@@ -10,7 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 import colors
 from fluidsynth import Fluidsynth
-from gridgets import ArpConfig, ColorPicker, DrumPicker, InstrumentPicker, LoopController, Menu, NotePicker, ScalePicker
+from gridgets import ArpConfig, ColorPicker, DrumPicker, InstrumentPicker, LoopController, Menu, Mixer, NotePicker, ScalePicker
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 import scales
@@ -51,6 +51,7 @@ class LaunchPad(object):
         self.surface = LPSurface(self)
         self.surface_map = dict() # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
+        self.mixer = Mixer(self)
         self.drumpickers = [DrumPicker(self, i) for i in range(16)]
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
