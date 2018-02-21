@@ -1,3 +1,4 @@
+import collections
 import logging
 import mido
 import shelve
@@ -162,7 +163,7 @@ class NotePicker(Gridget):
         self.channel = channel
         persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
         self.led2note = {}
-        self.note2leds = {}
+        self.note2leds = collections.defaultdict(list)
         self.switch()
 
     @property
