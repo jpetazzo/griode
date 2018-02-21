@@ -542,16 +542,25 @@ class ArpConfig(Gridget):
                                 color = colors.GREEN_HI
                         if row in [2, 3, 4]:
                             if gate > row-2:
-                                color = colors.SPRING
+                                if harmonies:
+                                    color = colors.SPRING
+                                else:
+                                    color = colors.GREY_LO
                         if row in [5, 6, 7, 8]:
                             if velocity > row-5:
-                                color = colors.LIME
+                                if harmonies:
+                                    color = colors.LIME
+                                else:
+                                    color = colors.GREY_LO
                     if self.page == "MOTIF":
                         if row-1 in harmonies:
                             if step == self.current_step:
                                 color = colors.AMBER
                             else:
-                                color = colors.GREEN
+                                if velocity<2:
+                                    color = colors.GREY_LO
+                                else:
+                                    color = colors.GREEN
                 self.surface[led] = color
 
     def pad_pressed(self, row, column, velocity):
