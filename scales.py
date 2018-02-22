@@ -7,6 +7,6 @@ ARABIC = (C, Dflat, E, F, G, Aflat, B)
 HUNGARIAN_MINOR = (C, D, Eflat, Fsharp, G, Aflat, B)
 
 palette = (
-        (MINOR, ARABIC, HUNGARIAN_MINOR, ),
-        (MAJOR, ),
-        )
+    (MINOR, ARABIC, HUNGARIAN_MINOR, ),
+    (MAJOR, ),
+)

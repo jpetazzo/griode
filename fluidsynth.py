@@ -10,6 +10,7 @@ import subprocess
 # For more details, see:
 # https://github.com/FluidSynth/fluidsynth/blob/28a794a61cbca3181b21e2781d93c1bffc7c1b97/src/synth/fluid_synth.h#L55
 
+
 class Instrument(object):
 
     def __init__(self, font, program, bank, name):
@@ -26,10 +27,10 @@ class Instrument(object):
         """Generate MIDI messages to switch to that instrument."""
         # FIXME: deal with font
         return [
-                mido.Message("control_change", control=0, value=self.bank//128),
-                mido.Message("control_change", control=32, value=self.bank%128),
-                mido.Message("program_change", program=self.program),
-                ]
+            mido.Message("control_change", control=0, value=self.bank//128),
+            mido.Message("control_change", control=32, value=self.bank%128),
+            mido.Message("program_change", program=self.program),
+        ]
 
 
 class Fluidsynth(object):
@@ -39,17 +40,18 @@ class Fluidsynth(object):
 
         # Pre-flight check
         if not os.path.isfile(default_soundfont):
-            print("File {} not found. Fluidsynth cannot start.".format(default_soundfont))
-            print("Go to the soundfonts/ directory and run the download script!")
+            print("File {} not found. Fluidsynth cannot start."
+                  .format(default_soundfont))
+            print("Suggestion: 'cd soundfonts; ./download-soundfonts.sh'")
             exit(1)
 
         # Spawn fluidsynth process
         self.fluidsynth = subprocess.Popen(
             ["fluidsynth", "-a", "pulseaudio",
-            "-o", "synth.midi-bank-select=mma",
-            "-c", "8", "-p", "griode", default_soundfont],
+             "-o", "synth.midi-bank-select=mma",
+             "-c", "8", "-p", "griode", default_soundfont],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
-            )
+        )
 
         # Enumerate instruments in the default soundfont
         self.instruments = []
@@ -63,7 +65,8 @@ class Fluidsynth(object):
             bank_prog, program_name = line.split(b" ", 1)
             bank, prog = [int(x) for x in bank_prog.split(b"-")]
             name = program_name.decode("ascii").strip()
-            logging.debug("Adding instrument {} -> {} -> {}".format(prog, bank, name))
+            logging.debug("Adding instrument {} -> {} -> {}"
+                          .format(prog, bank, name))
             self.instruments.append(Instrument(1, prog, bank, name))
 
         # Build the fonts structure
@@ -71,7 +74,9 @@ class Fluidsynth(object):
 
         # Re-order the instruments list
         # (This is used to cycle through instruments in order)
-        self.instruments.sort(key=lambda i: (i.font_index, i.program, i.bank_index))
+        def get_instrument_order(i):
+            return (i.font_index, i.program, i.bank_index)
+        self.instruments.sort(key=get_instrument_order)
 
         # Find the MIDI port created by fluidsynth and open it
         fluidsynth_ports = [p for p in mido.get_output_names() if "griode" in p]
@@ -105,14 +110,17 @@ def classify(list_of_things, get_key):
 
 
 def get_dk_and_font(i):
-    if i.bank<100:
+    if i.bank < 100:
         return (False, i.font)
     else:
         return (True, i.font)
+
 def get_group(i):
-    return i.program//8
+    return i.program // 8
+
 def get_instr(i):
-    return i.program%8
+    return i.program % 8
+
 def get_bank(i):
     return i.bank
 
@@ -127,10 +135,10 @@ def build_fonts(instruments):
                 banks = sorted(banks.items())
                 # Annotate instruments with the bank_index
                 for bank_index, (bank_value, instruments) in enumerate(banks):
-                    assert len(instruments)==1
+                    assert len(instruments) == 1
                     instruments[0].bank_index = bank_index
-                instrs[instr] = { instruments[0].bank_index: instruments[0]
-                                  for (bank_value, instruments) in banks }
+                instrs[instr] = {instruments[0].bank_index: instruments[0]
+                                 for (bank_value, instruments) in banks}
             groups[group] = instrs
         fonts[dk_and_font] = groups
     fonts = sorted(fonts.items())
@@ -149,4 +157,3 @@ def build_fonts(instruments):
     return fonts
 
     # fonts[font_index=0..N][group=0..15][program=0..7][bank_index=0..N]
-

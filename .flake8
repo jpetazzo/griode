@@ -1,0 +1,10 @@
+[flake8]
+ignore = 
+	E201 # White space after [
+	E202 # White space before ]
+	E225 # Spaces around operators
+	E226 # Spaces around arithmetic operators
+	E228 # Spaces around modulo operator
+	E251 # Spaces around = in keyword parameters
+	E302 # For when we use ##### instead of double line break
+	E501 # Line too long

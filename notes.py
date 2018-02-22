@@ -15,5 +15,3 @@ A = 9
 Asharp = 10
 Bflat = 10
 B = 11
-
-
