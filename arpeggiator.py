@@ -6,9 +6,9 @@ from persistence import persistent_attrs, persistent_attrs_init
 
 
 @persistent_attrs(
-        enabled=True, interval=6, pattern_length=4,
-        pattern=[[4, 3, [0]], [1, 2, [0]], [3, 1, [0]], [1, 2, [0]]],
-        )
+    enabled=True, interval=6, pattern_length=4,
+    pattern=[[4, 3, [0]], [1, 2, [0]], [3, 1, [0]], [1, 2, [0]]],
+)
 class Arpeggiator(object):
 
     def __init__(self, devicechain):
