@@ -2,6 +2,7 @@
 import logging
 import os
 import mido
+import resource
 import time
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
@@ -29,6 +30,7 @@ class Griode(object):
         self.synth = Fluidsynth()
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
+        self.cpu = CPU(self)
         self.beatclock = BeatClock(self)
         self.looper = Looper(self)
         from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
@@ -126,6 +128,7 @@ class BeatClock(object):
         for grid in self.griode.grids:
             grid.loopcontroller.tick(self.tick)
         self.griode.looper.tick(self.tick)
+        self.griode.cpu.tick(self.tick)
 
     def poll(self):
         now = time.time()
@@ -139,13 +142,35 @@ class BeatClock(object):
             print("We're running late by {} seconds!".format(self.next-now))
             # If we are late by more than 1 second, catch up.
             if now > self.next + 1.0:
-                print("Cactching up (deciding that next tick = now).")
+                print("Catching up (deciding that next tick = now).")
                 self.next = now
             return 0
         return self.next - now
 
     def once(self):
         time.sleep(self.poll())
+
+##############################################################################
+
+class CPU(object):
+    # Keep track of our CPU usage.
+
+    def __init__(self, griode):
+        self.griode = griode
+        self.last_usage = 0
+        self.last_time = 0
+        self.last_shown = 0
+
+    def tick(self, tick):
+        r = resource.getrusage(resource.RUSAGE_SELF)
+        new_usage = r.ru_utime + r.ru_stime
+        new_time = time.time()
+        if new_time > self.last_shown + 1.0:
+            percent = (new_usage-self.last_usage)/(new_time-self.last_time)
+            logging.debug("CPU usage: {:.2%}".format(percent))
+            self.last_shown = new_time
+        self.last_usage = new_usage
+        self.last_time = new_time
 
 ##############################################################################
 
