@@ -7,6 +7,9 @@ import colors
 
 # And first, a few constants
 
+ARROWS = "UP DOWN LEFT RIGHT".split()
+MENU = "BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()
+
 channel_colors = [
     colors.RED_HI,
     colors.AMBER_HI,

@@ -67,6 +67,7 @@ Each "stage" sends messages directly to the next, using the `send()` method.
   - scale💾
   - key💾
   - grids[]
+    - grid_name
     - channel💾
     - focus(gridget, leds[])
     - surface

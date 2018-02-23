@@ -85,7 +85,7 @@ class NotePicker(Gridget):
         for button in "UP DOWN LEFT RIGHT".split():
             self.surface[button] = channel_colors[channel]
         self.channel = channel
-        persistent_attrs_init(self, "{}__{}".format(self.grid.port_name, channel))
+        persistent_attrs_init(self, "{}__{}".format(self.grid.grid_name, channel))
         self.led2note = {}
         self.note2leds = collections.defaultdict(list)
         self.switch()
