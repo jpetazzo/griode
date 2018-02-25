@@ -383,10 +383,16 @@ class ScalePicker(Gridget):
 
         for row, line in enumerate(scales.palette):
             for column, scale in enumerate(line):
-                if scale == current_scale:
+                if scale == tuple(current_scale):
                     leds[row+1, column+1] = colors.RED
 
         return leds
+
+    def cue(self, note):
+        message = mido.Message("note_on", channel=self.grid.channel,
+                               note=48+note, velocity=96)
+        self.grid.griode.synth.send(message)
+        self.grid.griode.synth.send(message.copy(velocity=0))
 
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
@@ -396,17 +402,26 @@ class ScalePicker(Gridget):
         if row in [7, 8]:
             note = piano2note.get((row-6, column))
             if note is not None:
+                self.cue(note)
                 self.grid.griode.key = note
-                message = mido.Message("note_on", channel=self.grid.channel,
-                                       note=48+note, velocity=96)
-                self.grid.griode.synth.send(message)
-                self.grid.griode.synth.send(message.copy(velocity=0))
+
+        # Manually tweak the scale
+        if row in [4, 5]:
+            note = piano2note.get((row-3, column))
+            if note is not None:
+                self.cue(note+self.grid.griode.key)
+                if note != 0:  # Do not remove the first note of the scale!
+                    if note in self.grid.griode.scale:
+                        self.grid.griode.scale.remove(note)
+                    else:
+                        self.grid.griode.scale.append(note)
+                        self.grid.griode.scale.sort()
 
         # Pick a scale from the palette
         if row in [1, 2]:
             try:
                 scale = scales.palette[row-1][column-1]
-                self.grid.griode.scale = scale
+                self.grid.griode.scale = list(scale)
             except IndexError:
                 pass
 
