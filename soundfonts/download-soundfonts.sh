@@ -27,4 +27,4 @@ if ! [ -f "$FILENAME" ]; then
 	rm "$ARCHIVE"
 fi
 
-[ ! -e default.sf2 ] && [ -e generaluser.sf2 ] && ln -s generaluser.sf2 default.sf2
+[ ! -e 0.sf2 ] && [ -e generaluser.sf2 ] && ln -s generaluser.sf2 0.sf2

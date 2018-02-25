@@ -1,3 +1,4 @@
+import glob
 import logging
 import mido
 import os
@@ -16,7 +17,7 @@ class Instrument(object):
     def __init__(self, font, program, bank, name):
         self.font = font        # fluidsynth font number (starts at 1)
         self.program = program  # MIDI program number [0..127]
-        self.bank = bank        # MIDI bank [0..127]
+        self.bank = bank        # MIDI bank [includes offset, so [0..9128]
         self.name = name        # string (not guaranteed to be unique!)
         # This information is computed once all instruments are loaded
         self.is_drumkit = None  # True for drumkits, False for others
@@ -25,7 +26,6 @@ class Instrument(object):
 
     def messages(self):
         """Generate MIDI messages to switch to that instrument."""
-        # FIXME: deal with font
         return [
             mido.Message("control_change", control=0, value=self.bank//128),
             mido.Message("control_change", control=32, value=self.bank%128),
@@ -36,12 +36,11 @@ class Instrument(object):
 class Fluidsynth(object):
 
     def __init__(self):
-        default_soundfont = "soundfonts/default.sf2"
+        soundfonts = sorted(glob.glob("soundfonts/?.sf2"))
 
         # Pre-flight check
-        if not os.path.isfile(default_soundfont):
-            print("File {} not found. Fluidsynth cannot start."
-                  .format(default_soundfont))
+        if not soundfonts:
+            print("No soundfont could be found. Fluidsynth cannot start.")
             print("Suggestion: 'cd soundfonts; ./download-soundfonts.sh'")
             exit(1)
 
@@ -49,25 +48,44 @@ class Fluidsynth(object):
         self.fluidsynth = subprocess.Popen(
             ["fluidsynth", "-a", "pulseaudio",
              "-o", "synth.midi-bank-select=mma",
-             "-c", "8", "-p", "griode", default_soundfont],
+             "-c", "8", "-p", "griode"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
 
-        # Enumerate instruments in the default soundfont
         self.instruments = []
+
+        # Wait for fluidsynth prompt
         while self.fluidsynth.stdout.peek() != b"> ":
             self.fluidsynth.stdout.readline()
-        self.fluidsynth.stdin.write(b"inst 1\n")
-        self.fluidsynth.stdin.flush()
-        self.fluidsynth.stdout.readline()
-        while self.fluidsynth.stdout.peek() != b"> ":
-            line = self.fluidsynth.stdout.readline()
-            bank_prog, program_name = line.split(b" ", 1)
-            bank, prog = [int(x) for x in bank_prog.split(b"-")]
-            name = program_name.decode("ascii").strip()
-            logging.debug("Adding instrument {} -> {} -> {}"
-                          .format(prog, bank, name))
-            self.instruments.append(Instrument(1, prog, bank, name))
+
+        # Now load each sound font one by one
+        for i, soundfont in enumerate(soundfonts):
+            logging.debug("Loading soundfont {} in position {}"
+                          .format(soundfont, i))
+            font_id = i+1
+            offset = i*1000
+            self.fluidsynth.stdin.write("load {} 1 {}\n"
+                                        .format(soundfont, offset)
+                                        .encode("ascii"))
+            self.fluidsynth.stdin.flush()
+            self.fluidsynth.stdout.readline()
+            # Wait for prompt again
+            while self.fluidsynth.stdout.peek() != b"> ":
+                self.fluidsynth.stdout.readline()
+            # Enumerate instruments in the soundfont
+            self.fluidsynth.stdin.write("inst {}\n"
+                                        .format(font_id)
+                                        .encode("ascii"))
+            self.fluidsynth.stdin.flush()
+            self.fluidsynth.stdout.readline()
+            while self.fluidsynth.stdout.peek() != b"> ":
+                line = self.fluidsynth.stdout.readline()
+                bank_prog, program_name = line.split(b" ", 1)
+                bank, prog = [int(x) for x in bank_prog.split(b"-")]
+                name = program_name.decode("ascii").strip()
+                logging.debug("Adding instrument {} -> {} -> {}"
+                              .format(prog, bank, name))
+                self.instruments.append(Instrument(font_id, prog, bank, name))
 
         # Build the fonts structure
         self.fonts = build_fonts(self.instruments)
@@ -110,7 +128,7 @@ def classify(list_of_things, get_key):
 
 
 def get_dk_and_font(i):
-    if i.bank < 100:
+    if i.bank%1000 < 100:
         return (False, i.font)
     else:
         return (True, i.font)

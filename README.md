@@ -5,7 +5,25 @@ Griode lets you play music using a LaunchPad or a similar controller.
 For short demos and tutorials, check this [YouTube playlist](https://www.youtube.com/playlist?list=PLBAFXs0YjviK9PzKnr3MDsRU6YAJgeH1K).
 
 
-## Installation and requirements
+## Quick start
+
+Here are some quick instructions to get you started, assuming that you
+have a LaunchPad connected to an Debian/Ubuntu system:
+
+```
+git clone git://github.com/jpetazzo/griode
+cd griode
+sudo apt-get install python3-dev libasound2-dev libjack-dev fluidsynth
+pip install --user -r requirements.txt
+( cd soundfonts; ./download-soundfonts.sh; )
+./griode.py
+```
+
+Your LaunchPad should light up with a red and white pattern, and pressing
+pads should make piano sounds.
+
+
+## Detailed setup instructions
 
 You need:
 
@@ -17,9 +35,21 @@ You need:
 
 ### Installing Python dependencies
 
-On Debian/Ubuntu systems, you should `apt-get install python3-dev libasound2-dev libjack-dev`.
+On Debian/Ubuntu systems, you will need the following system packages,
+so that the `python-rtmidi` Python package can be installed correctly:
 
-Then you can `pip install -r requirements.txt`.
+```bash
+apt-get install python3-dev libasound2-dev libjack-dev
+```
+
+You can then install Griode's requirements with `pip`:
+
+```bash
+pip install --user -r requirements.txt
+```
+
+Of course, you are welcome to use `virtualenv` or anything like that
+if you want.
 
 If you get compilation errors, you might need extra packages (libraries or headers).
 
@@ -31,18 +61,29 @@ Griode will start, but you will get another bizarre error at a later point.
 
 ### Installing FluidSynth
 
-On Debian/Ubuntu systems, `apt-get install fluidsynth` will do the trick.
+Fluidsynth is a software synthesizer. On Debian/Ubuntu systems, you
+can install it with:
+
+```
+apt-get install fluidsynth
+```
 
 
 ### Installing SoundFonts
 
-Go to the `soundfonts` subdirectory, and run the script `download-soundfonts.sh`.
+Griode requires at least one "SoundFont" so that FluidSynth can make
+sounds. The easiest way to get started is to go to the `soundfonts/`
+subdirectory, and run the script `download-soundfonts.sh`.
 
-Alternatively, you can download your own soundfonts, place them in this directory,
-and create a symlink `default.sf2` pointing to the soundfont you want to use.
+Griode will load SoundFonts called `?.sf2` in alphabetical order.
+The `download-soundfonts.sh` script will create a symlink `0.sf2`
+pointing to the "GeneralUser GS" SoundFont, which contains the
+128 instruments of the General MIDI standard, as well as a few
+variations, and a few drum kits.
 
-Note: Griode only supports one soundfont at a time right now, but this will
-change in the future.
+You are welcome to download your own soundfonts, place them in
+the `soundfonts/` subdirectory, and create symlinks to these files:
+they will be loaded when you start Griode.
 
 
 #### What are soundfonts?
@@ -65,19 +106,33 @@ Here are a few links to some SF2 files:
 - [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
 
 
-### Usage
+### LaunchPad
 
-After installing the dependencies as described above and ensuring your Launchpad
-is plugged into your machine, run `./griode.py`.
+Griode currently supports the Launchpad Pro, the Launchpad MK2 (aka "RGB"),
+and has partial support for the Launchpad S. You can plug multiple
+controllers and use them simultaneously.
 
-#### Debugging
+Griode relies on the name of the MIDI port reported by the `mido` library
+to detect your Launchpad(s). This has been tested on Linux, but the port
+names might be different on macOS or Windows.
 
-Set `LOG_LEVEL` environment variable to `DEBUG` for verbose output.
 
-## LaunchPad
+## Debugging
 
-I develop Griode with a LaunchPad Pro connected over USB.
+You can set the `LOG_LEVEL` environment variable to any valid `logging`
+level, e.g. `DEBUG` or `INFO`:
 
-I want to support other LaunchPads and possibly other grid-like
-instruments as well, but I only have access to a LaunchPad right now.
+```
+export LOG_LEVEL=DEBUG
+./griode.py
+```
+
+Note: `DEBUG` level is (and will always be) very verbose.
+
+
+### Persistence
+
+Griode saves all persistent information to the `state/` subdirectory.
+If you want to reset Griode (or some of its subsystems) to factory defaults,
+you can wipe out this directory (or some of the files therein).
 
