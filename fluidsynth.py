@@ -1,7 +1,6 @@
 import glob
 import logging
 import mido
-import os
 import subprocess
 
 # When we start the fluidsynth process, we use "MMA" bank select mode.

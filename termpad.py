@@ -28,7 +28,7 @@ class ASCIISurface(object):
 
     def write(self, s):
         os.write(self.grid.fd_out, s.encode("utf-8"))
-    
+
     def __setitem__(self, led, color):
         # This is a janky map but it will do for now
         char = {

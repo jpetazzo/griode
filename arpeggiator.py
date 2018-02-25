@@ -289,18 +289,24 @@ class ArpConfig(Gridget):
                 if led == (8, 1):
                     color = on_off_colors[self.arpeggiator.enabled]
                 row, column = led
+
                 def color_enum(klass, column, value):
                     if column == value:
                         return colors.PINK_HI
                     if column in [e.value for e in klass]:
                         return colors.ROSE
                     return colors.BLACK
+
                 if row == 6:
-                    color = color_enum(NoteOrder, column, self.arpeggiator.note_order.value)
+                    color = color_enum(NoteOrder, column,
+                                       self.arpeggiator.note_order.value)
                 if row == 4:
-                    color = color_enum(MotifMode, column, self.arpeggiator.motif_mode.value)
+                    color = color_enum(MotifMode, column,
+                                       self.arpeggiator.motif_mode.value)
                 if row == 2:
-                    color = color_enum(ScaleKey, column, self.arpeggiator.scale_key.value)
+                    color = color_enum(ScaleKey, column,
+                                       self.arpeggiator.scale_key.value)
+
                 self.surface[led] = color
 
     def draw_steps(self):

@@ -1,4 +1,5 @@
 [flake8]
+exclude = scales.py, chords.py
 ignore = 
 	E201 # White space after [
 	E202 # White space before ]

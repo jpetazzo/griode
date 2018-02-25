@@ -315,7 +315,7 @@ class ScalePicker(Gridget):
     CDEFGAB. pick key
     ........
     ##.###.. sharp of the key below
-    CDEFGAB. keys in scale
+    CDEFGABX keys in scale; X = play the scale
     ........
     XXXXXXXX modes
     XXXXXXXX scales

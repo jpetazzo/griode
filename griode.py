@@ -2,17 +2,17 @@
 import logging
 import os
 import mido
-import resource
 import time
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 from arpeggiator import ArpConfig, Arpeggiator
+from clock import BPMSetter, Clock, CPU
 import colors
 from fluidsynth import Fluidsynth
 from latch import Latch, LatchConfig
 from looper import Looper, LoopController
-from gridgets import BPMSetter, MENU, Menu, Mixer
+from gridgets import MENU, Menu, Mixer
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
@@ -32,11 +32,12 @@ class Griode(object):
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
         self.cpu = CPU(self)
-        self.beatclock = BeatClock(self)
+        self.clock = Clock(self)
         self.looper = Looper(self)
         # FIXME: probably make this configurable somehow (env var...?)
-        #from termpad import ASCIIGrid
-        #self.grids.append(ASCIIGrid(self, 0, 1))
+        if False:
+            from termpad import ASCIIGrid
+            self.grids.append(ASCIIGrid(self, 0, 1))
 
     def tick(self, tick):
         from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
@@ -133,65 +134,6 @@ class DeviceChain(object):
 
 ##############################################################################
 
-@persistent_attrs(bpm=120)
-class BeatClock(object):
-
-    def __init__(self, griode):
-        self.griode = griode
-        persistent_attrs_init(self)
-        self.tick = 0  # 24 ticks per quarter note
-        self.next = time.time()
-
-    def callback(self):
-        for devicechain in self.griode.devicechains:
-            devicechain.arpeggiator.tick(self.tick)
-        for grid in self.griode.grids:
-            grid.loopcontroller.tick(self.tick)
-        self.griode.looper.tick(self.tick)
-        self.griode.cpu.tick(self.tick)
-        self.griode.tick(self.tick)
-
-    def poll(self):
-        now = time.time()
-        if now < self.next:
-            return self.next - now
-        self.tick += 1
-        self.callback()
-        # Compute when we're due next
-        self.next += 60.0 / self.bpm / 24
-        if now > self.next:
-            print("We're running late by {} seconds!".format(self.next-now))
-            # If we are late by more than 1 second, catch up.
-            if now > self.next + 1.0:
-                print("Catching up (deciding that next tick = now).")
-                self.next = now
-            return 0
-        return self.next - now
-
-    def once(self):
-        time.sleep(self.poll())
-
-##############################################################################
-
-class CPU(object):
-    # Keep track of our CPU usage.
-
-    def __init__(self, griode):
-        self.griode = griode
-        self.last_usage = 0
-        self.last_time = 0
-        self.last_shown = 0
-
-    def tick(self, tick):
-        r = resource.getrusage(resource.RUSAGE_SELF)
-        new_usage = r.ru_utime + r.ru_stime
-        new_time = time.time()
-        if new_time > self.last_shown + 1.0:
-            percent = (new_usage-self.last_usage)/(new_time-self.last_time)
-            logging.debug("CPU usage: {:.2%}".format(percent))
-            self.last_shown = new_time
-        self.last_usage = new_usage
-        self.last_time = new_time
 
 ##############################################################################
 
@@ -199,7 +141,7 @@ def main():
     griode = Griode()
     try:
         while True:
-            griode.beatclock.once()
+            griode.clock.once()
     except KeyboardInterrupt:
         for grid in griode.grids:
             for led in grid.surface:

@@ -11,7 +11,7 @@ class Latch(object):
         self.devicechain = devicechain
         persistent_attrs_init(self, str(devicechain.channel))
         self.notes = set()
-        
+
     def send(self, message):
         if self.enabled and message.type == "note_on":
             note = message.note
@@ -33,7 +33,7 @@ class Latch(object):
                                  note=note, velocity=0)
             self.output(message)
         self.notes.clear()
-    
+
     def output(self, message):
         self.devicechain.arpeggiator.send(message)
 
