@@ -111,6 +111,7 @@ class Menu(Gridget):
             BUTTON_4 = [
                 self.grid.colorpicker,
                 self.grid.mixer,
+                self.grid.bpmsetter,
             ],
         )
         self.current = "BUTTON_2"
@@ -181,3 +182,74 @@ class Mixer(Gridget):
             control=7, value=volume)
         self.grid.griode.synth.send(message)
         self.draw()
+
+##############################################################################
+
+NUMBERS = """
+###  #  ### ### # # ### ### ### ### ###
+# #  #    #   # # # #   #     # # # # #
+# #  #  ### ### ### ### ###   # ### ###
+# #  #  #     #   #   # # #   # # #   #
+###  #  ### ###   # ### ###   # ### ###
+""".strip().split("\n")
+
+class BPMSetter(Gridget):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        self.surface[1, 1] = colors.ROSE
+        self.surface[1, 3] = colors.ROSE
+        self.surface[1, 6] = colors.ROSE
+        self.surface[1, 8] = colors.ROSE
+        self.draw()
+
+    @property
+    def beatclock(self):
+        return self.grid.griode.beatclock
+
+    def draw(self):
+        bpm = self.beatclock.bpm
+        d1 = bpm // 100
+        d2 = bpm // 10 % 10
+        d3 = bpm % 10
+        if d1 == 0:
+            for row in range(3, 9):
+                for column in [1, 8]:
+                    self.surface[row, column] = colors.BLACK
+            self.draw_digit(d2, 3, 2, colors.WHITE)
+            self.draw_digit(d3, 3, 5, colors.BLUE_HI)
+        else:
+            self.draw_digit(d1, 3, 1, colors.RED)
+            self.draw_digit(d2, 3, 3, colors.WHITE)
+            self.draw_digit(d3, 3, 6, colors.BLUE_HI)
+
+    def draw_digit(self, digit, row, column, color):
+        for line in range(5):
+            three_dots = NUMBERS[line][4*digit:4*digit+3]
+            for dot in range(3):
+                if three_dots[dot] == "#":
+                    draw_color = color
+                else:
+                    draw_color = colors.BLACK
+                draw_row = row + 4 - line
+                draw_column = column + dot
+                self.surface[draw_row, draw_column] = draw_color
+
+    def pad_pressed(self, row, column, velocity):
+        if velocity == 0:
+            return
+        if row == 1:
+            if column == 1:
+                self.beatclock.bpm -= 10
+            if column == 3:
+                self.beatclock.bpm -= 1
+            if column == 6:
+                self.beatclock.bpm += 1
+            if column == 8:
+                self.beatclock.bpm += 10
+            if self.beatclock.bpm < 50:
+                self.beatclock.bpm = 50
+            if self.beatclock.bpm > 199:
+                self.beatclock.bpm = 199
+            self.draw()

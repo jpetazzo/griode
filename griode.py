@@ -12,7 +12,7 @@ import colors
 from fluidsynth import Fluidsynth
 from latch import Latch, LatchConfig
 from looper import Looper, LoopController
-from gridgets import MENU, Menu, Mixer
+from gridgets import BPMSetter, MENU, Menu, Mixer
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
@@ -58,6 +58,7 @@ class Grid(object):
         self.surface_map = {}  # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
         self.mixer = Mixer(self)
+        self.bpmsetter = BPMSetter(self)
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)
