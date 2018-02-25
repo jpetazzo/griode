@@ -24,8 +24,17 @@ class Clock(object):
         persistent_attrs_init(self)
         self.tick = 0  # 24 ticks per quarter note
         self.next = time.time()
+        self.cues = []
+
+    def cue(self, when, func, args):
+        self.cues.append((self.tick+when, func, args))
 
     def callback(self):
+        expired_cues = [cue for cue in self.cues if cue[0] <= self.tick]
+        for when, func, args in expired_cues:
+            func(*args)
+        for cue in expired_cues:
+            self.cues.remove(cue)
         for devicechain in self.griode.devicechains:
             devicechain.arpeggiator.tick(self.tick)
         for grid in self.griode.grids:

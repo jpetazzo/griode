@@ -342,6 +342,8 @@ class ScalePicker(Gridget):
                     color = colors.BLUE_ORCHID
                 if row == 4 and column != 8:
                     color = colors.BLUE_ORCHID
+                if row == 4 and column == 8:
+                    color = colors.GREEN
                 if row == 2 or row == 1:
                     try:
                         scales.palette[row-1][column-1]
@@ -370,11 +372,15 @@ class ScalePicker(Gridget):
 
         return leds
 
-    def cue(self, note):
-        message = mido.Message("note_on", channel=self.grid.channel,
-                               note=48+note, velocity=96)
-        self.grid.griode.synth.send(message)
-        self.grid.griode.synth.send(message.copy(velocity=0))
+    def cue(self, notes):
+        duration = 12  # In ticks
+        send = self.grid.griode.synth.send
+        cue = self.grid.griode.clock.cue
+        for i, note in enumerate(notes):
+            message = mido.Message("note_on", channel=self.grid.channel,
+                                   note=48+note, velocity=96)
+            cue(duration*i, send, (message, ))
+            cue(duration*(i+1), send, (message.copy(velocity=0), ))
 
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:
@@ -384,7 +390,7 @@ class ScalePicker(Gridget):
         if row in [7, 8]:
             note = piano2note.get((row-6, column))
             if note is not None:
-                self.cue(note)
+                self.cue([note])
                 self.grid.griode.key = note
 
         # Manually tweak the scale
@@ -398,6 +404,10 @@ class ScalePicker(Gridget):
                     else:
                         self.grid.griode.scale.append(note)
                         self.grid.griode.scale.sort()
+
+        # Play the current scale
+        if (row, column) == (4, 8):
+            self.cue(self.grid.griode.scale + [12])
 
         # Pick a scale from the palette
         if row in [1, 2]:

@@ -32,7 +32,8 @@ Each "stage" sends messages directly to the next, using the `send()` method.
 ## Data model
 
 - griode
-  - beatclock
+  - clock
+    - cue(when, func, args)
   - looper
     - send(message)
     - tick()
