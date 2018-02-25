@@ -18,7 +18,6 @@ URL="http://http.debian.net/debian/pool/main/f/fluid-soundfont/fluid-soundfont_3
 ARCHIVE="fluidsoundfont.tgz"
 FILEPATH="fluid-soundfont-3.1/FluidR3_GM.sf2"
 FILENAME="fluidsoundfont.sf2"
-
 if ! [ -f "$FILENAME" ]; then
 	if ! [ -f "$ARCHIVE" ]; then
 		curl -L -o "$ARCHIVE" "$URL"
@@ -26,5 +25,8 @@ if ! [ -f "$FILENAME" ]; then
 	tar -Ozxf "$ARCHIVE" "$FILEPATH" > "$FILENAME"
 	rm "$ARCHIVE"
 fi
+
+# AWE32 ROM dump
+URL="http://heretics-hexens.ucoz.com/1mgm.sf2"
 
 [ ! -e 0.sf2 ] && [ -e generaluser.sf2 ] && ln -s generaluser.sf2 0.sf2

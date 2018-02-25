@@ -104,6 +104,7 @@ Here are a few links to some SF2 files:
 - [Fluid SoundFont](https://packages.debian.org/source/sid/fluid-soundfont)
 - [Soundfonts4U](https://sites.google.com/site/soundfonts4u/)
 - [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
+- [BASSMIDI](https://kode54.net/bassmididrv/BASSMIDI_Driver_Installation_and_Configuration.htm)
 
 
 ### LaunchPad
