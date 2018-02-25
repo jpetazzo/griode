@@ -10,6 +10,7 @@ logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 from arpeggiator import ArpConfig, Arpeggiator
 import colors
 from fluidsynth import Fluidsynth
+from latch import Latch, LatchConfig
 from looper import Looper, LoopController
 from gridgets import MENU, Menu, Mixer
 import notes
@@ -62,6 +63,7 @@ class Grid(object):
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)
         self.arpconfigs = [ArpConfig(self, i) for i in range(16)]
+        self.latchconfigs = [LatchConfig(self, i) for i in range(16)]
         self.loopcontroller = LoopController(self)
         self.menu = Menu(self)
         self.focus(self.menu, MENU)
@@ -94,6 +96,7 @@ class DeviceChain(object):
         persistent_attrs_init(self, str(channel))
         for message in self.instrument.messages():
             self.griode.synth.send(message.copy(channel=channel))
+        self.latch = Latch(self)
         self.arpeggiator = Arpeggiator(self)
 
     # The variables `..._index` indicate which instrument is currently selected.
@@ -109,7 +112,7 @@ class DeviceChain(object):
         return instrument
 
     def send(self, message):
-        self.arpeggiator.send(message)
+        self.latch.send(message)
 
 ##############################################################################
 

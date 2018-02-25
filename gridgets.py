@@ -106,6 +106,7 @@ class Menu(Gridget):
             BUTTON_3 = [
                 self.grid.instrumentpickers,
                 self.grid.arpconfigs,
+                self.grid.latchconfigs,
             ],
             BUTTON_4 = [
                 self.grid.colorpicker,

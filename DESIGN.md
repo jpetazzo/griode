@@ -24,7 +24,7 @@ as macros or shortcuts. It doesn't matter if there are 0, 8, or 100.
 
 ## Message flow
 
-input → looper → devicechains → arpeggiator → synth
+input → looper → devicechains → latch → arpeggiator → synth
 
 Each "stage" sends messages directly to the next, using the `send()` method.
 
@@ -57,6 +57,8 @@ Each "stage" sends messages directly to the next, using the `send()` method.
     - group_index💾
     - instr_index💾
     - bank_index💾
+    - latch
+      - enabled💾
     - arpeggiator
       - enabled💾
       - pattern_length💾
