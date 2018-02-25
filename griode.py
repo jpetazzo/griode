@@ -42,8 +42,8 @@ class Griode(object):
             if "Launchpad S" in port_name:
                 self.grids.append(LaunchpadS(self, port_name))
         # FIXME: probably make this configurable somehow (env var...?)
-        from termpad import ASCIIGrid
-        self.grids.append(ASCIIGrid(self, 0, 1))
+        #from termpad import ASCIIGrid
+        #self.grids.append(ASCIIGrid(self, 0, 1))
 
 ##############################################################################
 
