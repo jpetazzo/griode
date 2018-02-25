@@ -394,10 +394,10 @@ class ScalePicker(Gridget):
             note = piano2note.get((row-6, column))
             if note is not None:
                 self.grid.griode.key = note
-                message = mido.Message("note_on", note=48+note, velocity=96)
-                # FIXME channel #
-                self.grid.griode.devicechains[0].send(message)
-                self.grid.griode.devicechains[0].send(message.copy(velocity=0))
+                message = mido.Message("note_on", channel=self.grid.channel,
+                                       note=48+note, velocity=96)
+                self.grid.griode.synth.send(message)
+                self.grid.griode.synth.send(message.copy(velocity=0))
 
         # Pick a scale from the palette
         if row in [1, 2]:
