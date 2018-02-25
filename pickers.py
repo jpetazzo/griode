@@ -104,6 +104,13 @@ class NotePicker(Gridget):
             mapping = self.mapping
         else:
             self.mapping = mapping
+        # If we are in diatonic mode, we force the root key to be the root
+        # of the scale, otherwise the whole screen will be off.
+        # FIXME: allow to shift the diatonic mode.
+        if mapping == "DIATONIC":
+            root = self.root//12 * 12 + self.grid.griode.key
+        else:
+            root = self.root
         self.led2note.clear()
         for led in self.surface:
             if isinstance(led, tuple):
@@ -111,17 +118,17 @@ class NotePicker(Gridget):
                 if mapping == "CHROMATIC":
                     shift = 5
                     note = shift*(row-1) + (column-1)
-                    note += self.root
+                    note += root
                 elif mapping == "DIATONIC":
                     shift = 3
                     note = shift*(row-1) + (column-1)
                     octave = note//len(self.scale)
                     step = note%len(self.scale)
-                    note = self.root + 12*octave + self.scale[step]
+                    note = root + 12*octave + self.scale[step]
                 elif mapping == "MAGIC":
                     note = (column-1)*7 - (column-1)//2*12
                     note += (row-1)*4
-                    note += self.root
+                    note += root
                 self.led2note[led] = note
         self.note2leds.clear()
         for led, note in self.led2note.items():
@@ -161,10 +168,6 @@ class NotePicker(Gridget):
         elif button == "RIGHT":
             self.root += 1
         self.switch()
-        # FIXME in diatonic mode, we want to make sure that
-        # the root is in the scale.
-        # FIXME also there might be something special to do
-        # for the magic tone network mode.
 
     def pad_pressed(self, row, column, velocity):
         note = self.led2note[row, column]
