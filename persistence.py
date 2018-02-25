@@ -1,6 +1,13 @@
 import logging
 import shelve
 
+cache = {}
+
+def shelve_open(filename):
+    if filename not in cache:
+        cache[filename] = shelve.open(filename, writeback=True)
+    return cache[filename]
+
 def persistent_attrs(**kwargs):
     def wrap_class(klass):
         for attr_name, default_value in kwargs.items():
@@ -26,4 +33,4 @@ def persistent_attrs_init(self, id_str=None):
     else:
         self.db_filename = "state/{}__{}.sav".format(self.__class__.__name__, id_str)
     logging.debug("Opening shelf {}".format(self.db_filename))
-    self.db = shelve.open(self.db_filename, writeback=True)
+    self.db = shelve_open(self.db_filename)

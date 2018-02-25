@@ -34,17 +34,34 @@ class Griode(object):
         self.cpu = CPU(self)
         self.beatclock = BeatClock(self)
         self.looper = Looper(self)
-        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
-        for port_name in mido.get_ioport_names():
-            if "Launchpad Pro MIDI 2" in port_name:
-                self.grids.append(LaunchpadPro(self, port_name))
-            if "Launchpad MK2" in port_name:
-                self.grids.append(LaunchpadMK2(self, port_name))
-            if "Launchpad S" in port_name:
-                self.grids.append(LaunchpadS(self, port_name))
         # FIXME: probably make this configurable somehow (env var...?)
         #from termpad import ASCIIGrid
         #self.grids.append(ASCIIGrid(self, 0, 1))
+
+    def tick(self, tick):
+        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
+        if tick%100 == 1:
+            configured_ports = { grid.grid_name for grid in self.grids }
+            detected_ports = set(mido.get_ioport_names())
+            for port_name in detected_ports - configured_ports:
+                # Detected a new device! Yay!
+                klass = None
+                if "Launchpad Pro MIDI 2" in port_name:
+                    klass = LaunchpadPro
+                if "Launchpad MK2" in port_name:
+                    klass = LaunchpadMK2
+                if "Launchpad S" in port_name:
+                    klass = LaunchpadS
+                if klass is not None:
+                    # FIXME find a better way than this for hotplug!
+                    if tick > 1:
+                        time.sleep(4)
+                    self.grids.append(klass(self, port_name))
+            for port_name in configured_ports - detected_ports:
+                # Removing a device
+                logging.debug("Device {} is no longer plugged. Removing it."
+                              .format(port_name))
+                self.grids = [g for g in self.grids if g.grid_name != port_name]
 
 ##############################################################################
 
@@ -132,6 +149,7 @@ class BeatClock(object):
             grid.loopcontroller.tick(self.tick)
         self.griode.looper.tick(self.tick)
         self.griode.cpu.tick(self.tick)
+        self.griode.tick(self.tick)
 
     def poll(self):
         now = time.time()
