@@ -12,7 +12,7 @@ The arpeggiator config has multiple screens.
 You scroll between the different screens with UP/DOWN.
 
 ARPSETUP:
-E.LXXX.T -> Enable/disable arp; enable/disable latch; tempo monitor
+E......T -> Enable/disable arp; tempo monitor
 ........
 BBBBBBBB -> watch arp steps (to monitor speed); change speed/interval
 ........
@@ -83,7 +83,7 @@ class ScaleKey(enum.Enum):  # Which note will be the root of the scale?
 
 
 @persistent_attrs(
-    arp_enabled=False, latch_enabled=False, interval=6, pattern_length=4,
+    enabled=False, interval=6, pattern_length=4,
     pattern=[[4, 3, [0]], [1, 2, [0]], [3, 1, [0]], [1, 2, [0]]],
     note_order=NoteOrder.FIRST,
     motif_mode=MotifMode.DISABLED,
@@ -94,8 +94,8 @@ class Arpeggiator(object):
     def __init__(self, devicechain):
         self.devicechain = devicechain
         persistent_attrs_init(self, str(devicechain.channel))
-        self.arp_notes = []
-        self.next_note = 0  # That's a position in self.arp_notes
+        self.notes = []
+        self.next_note = 0  # That's a position in self.notes
         self.direction = 1  # Always 1, except when in BOUNCING mode
         self.latch_notes = set()
         self.playing = []
@@ -111,14 +111,14 @@ class Arpeggiator(object):
                 self.playing.remove((note, deadline))
 
         # If we're disabled, stop right there
-        if not self.arp_enabled:
-            self.arp_notes.clear()
+        if not self.enabled:
+            self.notes.clear()
             return
         # If it's not time yet to spell out the next note, stop right there
         if tick < self.next_tick:
             return
         # If there are no notes in the buffer (=pressed), stop right there
-        if self.arp_notes == []:
+        if self.notes == []:
             return
         # If we just got "woken up" set next_tick to the correct value
         if self.next_tick == 0:
@@ -133,23 +133,23 @@ class Arpeggiator(object):
         if self.motif_mode == MotifMode.DISABLED:
             # Do not use a scale, or rather, use a one-note scale.
             # (This way, Motif will trigger octaves.)
-            scale = [self.arp_notes[self.next_note]]
+            scale = [self.notes[self.next_note]]
         if self.motif_mode == MotifMode.BUFFER:
             # Use the buffer as a scale to play from.
-            scale = self.arp_notes
+            scale = self.notes
         if self.motif_mode == MotifMode.SCALE:
             # OK, we want to use the current (global) scale.
             # But we have to determine the root note.
             if self.scale_key == ScaleKey.FIRST:
-                key = self.arp_notes[0]
+                key = self.notes[0]
             if self.scale_key == ScaleKey.LAST:
-                key = self.arp_notes[-1]
+                key = self.notes[-1]
             if self.scale_key == ScaleKey.LOWER:
-                key = min(self.arp_notes)
+                key = min(self.notes)
             if self.scale_key == ScaleKey.HIGHER:
-                key = max(self.arp_notes)
+                key = max(self.notes)
             if self.scale_key == ScaleKey.NEXT:
-                key = self.arp_notes[self.next_note]
+                key = self.notes[self.next_note]
             scale = [key+note for note in self.devicechain.griode.scale]
 
         logging.debug("computed scale: {}".format(scale))
@@ -175,7 +175,7 @@ class Arpeggiator(object):
             self.output(mido.Message("note_on", note=note, velocity=velocity))
             self.playing.append((note, tick+duration))
 
-        # Cycle to the next position in the arp_notes buffer.
+        # Cycle to the next position in the notes buffer.
         self.next_note += self.direction
         # If we are past the beginning of the buffer...
         # (This happens only in BOUNCING mode.)
@@ -184,7 +184,7 @@ class Arpeggiator(object):
             self.next_note = 1
             self.direction = 1
         # If we are past the end of the buffer...
-        if self.next_note >= len(self.arp_notes):
+        if self.next_note >= len(self.notes):
             # Special case for bouncing mode: go back down!
             if self.note_order == NoteOrder.BOUNCING:
                 self.direction = -1
@@ -207,45 +207,45 @@ class Arpeggiator(object):
             self.next_step = 0
 
     def send(self, message):
-        if message.type == "note_on" and self.arp_enabled:
+        if message.type == "note_on" and self.enabled:
             if message.velocity > 0:
                 # If this is the first note played, "wake up" the arpeggiator.
-                if self.arp_notes == []:
+                if self.notes == []:
                     self.next_tick = 0
                     self.next_step = 0
-                    self.arp_notes.append(message.note)
+                    self.notes.append(message.note)
                 else:
                     # Add the note.
                     # The position where we add it depends of NoteOrder.
                     if self.note_order == NoteOrder.FIRST:
-                        self.arp_notes.insert(self.next_note, message.note)
+                        self.notes.insert(self.next_note, message.note)
                     if self.note_order == NoteOrder.LAST:
                         if self.next_note == 0:
-                            self.arp_notes.append(message.note)
+                            self.notes.append(message.note)
                         else:
-                            self.arp_notes.insert(self.next_note-1)
+                            self.notes.insert(self.next_note-1)
                     if self.note_order == NoteOrder.ASCENDING:
-                        self.arp_notes.append(message.note)
-                        self.arp_notes.sort()
+                        self.notes.append(message.note)
+                        self.notes.sort()
                         # FIXME fix up self.next_note
                     if self.note_order == NoteOrder.DESCENDING:
-                        self.arp_notes.append(message.note)
-                        self.arp_notes.sort()
-                        self.arp_notes.reverse()
+                        self.notes.append(message.note)
+                        self.notes.sort()
+                        self.notes.reverse()
                         # FIXME fix up self.next_note
                     if self.note_order == NoteOrder.BOUNCING:
-                        self.arp_notes.append(message.note)
-                        self.arp_notes.sort()
+                        self.notes.append(message.note)
+                        self.notes.sort()
                         if self.direction == -1:
-                            self.arp_notes.reverse()
+                            self.notes.reverse()
                         # FIXME fix up self.next_note
             else:
-                if message.note in self.arp_notes:
-                    index = self.arp_notes.index(message.note)
+                if message.note in self.notes:
+                    index = self.notes.index(message.note)
                     if self.next_note > index:
                         self.next_note -= 1
-                    self.arp_notes.remove(message.note)
-                    if self.next_note >= len(self.arp_notes):
+                    self.notes.remove(message.note)
+                    if self.next_note >= len(self.notes):
                         self.next_note = 0
         else:
             self.output(message)
@@ -287,9 +287,7 @@ class ArpConfig(Gridget):
             if isinstance(led, tuple):
                 color = colors.BLACK
                 if led == (8, 1):
-                    color = on_off_colors[self.arpeggiator.arp_enabled]
-                if led == (8, 3):
-                    color = on_off_colors[self.arpeggiator.latch_enabled]
+                    color = on_off_colors[self.arpeggiator.enabled]
                 row, column = led
                 def color_enum(klass, column, value):
                     if column == value:
@@ -366,9 +364,7 @@ class ArpConfig(Gridget):
                 self.arpeggiator.pattern[step][2].append(harmony)
         if self.page == Page.ARPSETUP:
             if (row, column) == (8, 1):
-                self.arpeggiator.arp_enabled = not self.arpeggiator.arp_enabled
-            if (row, column) == (8, 3):
-                self.arpeggiator.latch_enabled = not self.arpeggiator.latch_enabled
+                self.arpeggiator.enabled = not self.arpeggiator.enabled
             if row == 6:
                 self.arpeggiator.note_order = NoteOrder(column)
             if row == 4:
