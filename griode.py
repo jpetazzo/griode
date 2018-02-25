@@ -15,7 +15,7 @@ from looper import Looper, LoopController
 from gridgets import MENU, Menu, Mixer
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
-from pickers import ColorPicker, DrumPicker, InstrumentPicker, NotePicker, ScalePicker
+from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
 
 
@@ -58,7 +58,6 @@ class Grid(object):
         self.surface_map = {}  # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
         self.mixer = Mixer(self)
-        self.drumpickers = [DrumPicker(self, i) for i in range(16)]
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
         self.scalepicker = ScalePicker(self)

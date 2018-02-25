@@ -101,7 +101,7 @@ class Menu(Gridget):
                 "CHROMATIC",
                 "DIATONIC",
                 "MAGIC",
-                self.grid.drumpickers,
+                "DRUMKIT",
             ],
             BUTTON_3 = [
                 self.grid.instrumentpickers,

@@ -27,52 +27,18 @@ class ColorPicker(Gridget):
 
 ##############################################################################
 
-class DrumPicker(Gridget):
-
-    # There are some interesting layouts there:
-    FOUR_FOUR_MAP = [
-        [55, 49, 56, 57],
-        [41, 43, 47, 50],
-        [40, 38, 46, 53],
-        [37, 36, 42, 51],
-    ][::-1]
-    FOUR_EIGHT_MAP = [
-        [49, 57, 55, 52, 53, 59, 51, None],
-        [50, 48, 47, 45, 43, 41, None, 46],
-        [40, 38, 37, None, 39, 54, None, 42],
-        [36, 35, None, None, 75, 56, None, 44],
-    ][::-1]
-
-    def __init__(self, grid, channel):
-        self.grid = grid
-        self.surface = Surface(grid.surface)
-        self.channel = channel
-        self.map = self.FOUR_EIGHT_MAP
-        self.draw()
-
-    def rc2note(self, row, column):
-        try:
-            return self.map[row-1][column-1]
-        except IndexError:
-            return None
-
-    def draw(self):
-        for led in self.surface:
-            if isinstance(led, tuple):
-                row, column = led
-                if self.rc2note(row, column):
-                    self.surface[led] = channel_colors[self.channel]
-
-    def pad_pressed(self, row, column, velocity):
-        note = self.rc2note(row, column)
-        if not note:
-            return
-        message = mido.Message(
-            "note_on", channel=self.channel,
-            note=note, velocity=velocity)
-        self.grid.griode.looper.send(message)
-        color = colors.PINK_HI if velocity>0 else channel_colors[self.channel]
-        self.surface[row, column] = color
+FOUR_FOUR_MAP = [
+    [55, 49, 56, 57],
+    [41, 43, 47, 50],
+    [40, 38, 46, 53],
+    [37, 36, 42, 51],
+]
+FOUR_EIGHT_MAP = [
+    [49, 57, 55, 52, 53, 59, 51, None],
+    [50, 48, 47, 45, 43, 41, None, 46],
+    [40, 38, 37, None, 39, 54, None, 42],
+    [36, 35, None, None, 75, 56, None, 44],
+]
 
 ##############################################################################
 
@@ -129,6 +95,11 @@ class NotePicker(Gridget):
                     note = (column-1)*7 - (column-1)//2*12
                     note += (row-1)*4
                     note += root
+                elif mapping == "DRUMKIT":
+                    try:
+                        note = FOUR_EIGHT_MAP[::-1][row-1][column-1]
+                    except IndexError:
+                        note = None
                 self.led2note[led] = note
         self.note2leds.clear()
         for led, note in self.led2note.items():
@@ -145,6 +116,14 @@ class NotePicker(Gridget):
         return note%12 in scale
 
     def note2color(self, note):
+        # For drumkit, just show which notes are mapped.
+        if self.mapping == "DRUMKIT":
+            if note is not None:
+                return channel_colors[self.channel]
+            else:
+                return colors.BLACK
+
+        # For other layouts, properly show notes that are in scale.
         if self.is_key(note):
             return channel_colors[self.channel]
         if self.is_in_scale(note):
@@ -159,6 +138,7 @@ class NotePicker(Gridget):
                 self.surface[led] = color
 
     def button_pressed(self, button):
+        # FIXME allow to change layout for DRUMKIT? Or?
         if button == "UP":
             self.root += 12
         elif button == "DOWN":
@@ -171,6 +151,8 @@ class NotePicker(Gridget):
 
     def pad_pressed(self, row, column, velocity):
         note = self.led2note[row, column]
+        if note is None:
+            return
         # Velocity curve (this is kind of a hack for now)
         # FIXME this probably should be moved to the devicechains
         if velocity > 0:
