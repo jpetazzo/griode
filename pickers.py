@@ -397,7 +397,7 @@ class ScalePicker(Gridget):
         if row in [4, 5]:
             note = piano2note.get((row-3, column))
             if note is not None:
-                self.cue(note+self.grid.griode.key)
+                self.cue([note+self.grid.griode.key])
                 if note != 0:  # Do not remove the first note of the scale!
                     if note in self.grid.griode.scale:
                         self.grid.griode.scale.remove(note)
@@ -407,7 +407,9 @@ class ScalePicker(Gridget):
 
         # Play the current scale
         if (row, column) == (4, 8):
-            self.cue(self.grid.griode.scale + [12])
+            scale = [self.grid.griode.key + n
+                     for n in self.grid.griode.scale + [12]]
+            self.cue(scale)
 
         # Pick a scale from the palette
         if row in [1, 2]:
