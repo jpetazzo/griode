@@ -307,7 +307,7 @@ class LoopEditor(Gridget):
                             color = channel_colors[self.loop.channel]
                 if self.loop.tick_in in ticks:
                     color = colors.PINK_HI
-                if self.loop.tick_out in ticks:
+                if self.loop.tick_out-1 in ticks:
                     color = colors.PINK_HI
                 self.surface[led] = color
 
@@ -328,7 +328,7 @@ class LoopEditor(Gridget):
             self.action = None
         else:
             ticks = self.rc2ticks(row, column)
-            if self.loop.tick_out in ticks:
+            if self.loop.tick_out-1 in ticks:
                 logging.info("Action is now SET_TICK_OUT")
                 self.action = "SET_TICK_OUT"
             elif self.loop.tick_in in ticks:
