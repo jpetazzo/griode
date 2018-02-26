@@ -115,7 +115,7 @@ class LoopController(Gridget):
         self.grid = grid
         self.surface = Surface(grid.surface)
         self.loopeditor = LoopEditor(grid)
-        self.mode = "REC"    # or "PLAY"
+        self.mode = "PLAY"   # or "REC"
         self.pads_held = {}  # maps pad to time when pressed
         self.draw()
 
