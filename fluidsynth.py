@@ -45,8 +45,9 @@ class Fluidsynth(object):
 
         # Spawn fluidsynth process
         self.fluidsynth = subprocess.Popen(
-            ["fluidsynth", "-a", "pulseaudio",
+            ["fluidsynth", "-a", "alsa",
              "-o", "synth.midi-bank-select=mma",
+             "-o", "synth.sample-rate=44100",
              "-c", "8", "-p", "griode"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE
         )
@@ -115,7 +116,7 @@ def classify(list_of_things, get_key):
     """Transform a `list_of_things` into a `dict_of_things`.
 
     Each thing will be put in dict_of_things[k] where k
-    is obtained by appling the function `get_key` to the thing.
+    is obtained by applying the function `get_key` to the thing.
     """
     dict_of_things = {}
     for thing in list_of_things:
