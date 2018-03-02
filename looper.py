@@ -14,20 +14,17 @@ class Note(object):
         self.duration = duration
 
 
-@persistent_attrs(notes={}, channel=0, tick_in=0, tick_out=0)
+@persistent_attrs(notes={}, channel=None, tick_in=0, tick_out=0)
 class Loop(object):
     def __init__(self, looper, cell):
         logging.info("Loop.__init__()")
         self.looper = looper
         persistent_attrs_init(self, "{},{}".format(*cell))
         self.next_tick = 0  # next "position" to be played in self.notes
-        self.looper.looprefs.add(cell)
 
 
-@persistent_attrs(beats_per_bar=4, looprefs=set())
+@persistent_attrs(beats_per_bar=4)
 class Looper(object):
-
-    Loop = Loop
 
     def __init__(self, griode):
         self.griode = griode
@@ -39,8 +36,9 @@ class Looper(object):
         self.notes_recording = {}     # note -> (Note(), tick_when_started)
         self.notes_playing = []       # (stop_tick, channel, note)
         self.loops = {}
-        for cell in self.looprefs:
-            self.loops[cell] = Loop(self, cell)
+        for row in range(1, 9):
+            for column in range(1, 9):
+                self.loops[row, column] = Loop(self, (row, column))
 
     def send(self, message):
         if self.playing and message.type == "note_on":
@@ -66,6 +64,13 @@ class Looper(object):
         devicechain.send(message)
 
     def tick(self, tick):
+        # FIXME force a sync of loop data but spread that over time
+        row = tick % 10
+        column = tick//10 % 10
+        loop = self.loops.get((row, column))
+        if loop is not None:
+            if loop.channel is not None:
+                loop.db.sync()
         self.last_tick = tick
         # First, check if there are notes that should be stopped.
         notes_to_stop = [note for note in self.notes_playing if note[0] <= tick]
@@ -115,6 +120,7 @@ class LoopController(Gridget):
         self.grid = grid
         self.surface = Surface(grid.surface)
         self.loopeditor = LoopEditor(grid)
+        self.stepsequencer = StepSequencer(grid)
         self.mode = "PLAY"   # or "REC"
         self.pads_held = {}  # maps pad to time when pressed
         self.draw()
@@ -149,9 +155,8 @@ class LoopController(Gridget):
         for led in self.surface:
             if isinstance(led, tuple):
                 color = colors.GREY_LO
-                if led in self.looper.loops:
-                    # If there is a loop in that cell, light it up
-                    loop = self.looper.loops[led]
+                loop = self.looper.loops[led]
+                if loop.channel is not None:
                     color = channel_colors[loop.channel]
                     # If that loop is selected for play or rec, show it
                     # (With fancy blinking)
@@ -179,11 +184,12 @@ class LoopController(Gridget):
                 self.pads_held.clear()
                 # Enter edit mode for that pad
                 loop = self.looper.loops[cell]
-                self.loopeditor.edit(loop)
+                self.loopeditor.loop = loop
                 self.grid.focus(self.loopeditor)
                 break
         self.draw()
         self.loopeditor.draw()
+        self.stepsequencer.draw()
 
     def pad_pressed(self, row, column, velocity):
         # We don't act when the pad is pressed, but when it is released.
@@ -198,21 +204,18 @@ class LoopController(Gridget):
             return
         del self.pads_held[row, column]
         if self.mode == "PLAY":
-            # Did we tap a loop that actually exists?
-            loop = self.looper.loops.get((row, column))
-            if loop:
+            loop = self.looper.loops[row, column]
+            # Does that loop actually exist?
+            if loop.channel is not None:
                 if loop in self.looper.loops_playing:
                     self.looper.loops_playing.remove(loop)
                 else:
                     self.looper.loops_playing.add(loop)
         if self.mode == "REC":
+            loop = self.looper.loops[row, column]
             # If we tapped an empty cell, create a new loop
-            if (row, column) not in self.looper.loops:
-                loop = self.looper.Loop(self.looper, (row, column))
+            if loop.channel is None:
                 loop.channel = self.grid.channel
-                self.looper.loops[row, column] = loop
-            else:
-                loop = self.looper.loops[row, column]
             if loop in self.looper.loops_recording:
                 self.looper.loops_recording.remove(loop)
             else:
@@ -231,18 +234,15 @@ class LoopController(Gridget):
             if self.pads_held:
                 # Delete!
                 for cell in self.pads_held:
-                    loop = self.looper.loops.get(cell)
-                    if not loop:
-                        continue
                     # OK, this is hackish.
                     # We can't easily wipe out an object from the persistence
                     # system, so we re-initialize it to empty values instead.
+                    loop = self.looper.loops[cell]
+                    loop.channel = None
                     loop.tick_in = loop.tick_out = 0
                     loop.notes.clear()
                     self.looper.loops_playing.discard(loop)
                     self.looper.loops_recording.discard(loop)
-                    self.looper.looprefs.discard(cell)
-                    del self.looper.loops[cell]
                 self.pads_held.clear()
             else:
                 # Rewind
@@ -267,17 +267,21 @@ class LoopController(Gridget):
             grid.loopcontroller.draw()
 
 
-class LoopEditor(Gridget):
+class CellPicker(Gridget):
 
     def __init__(self, grid):
         self.grid = grid
         self.surface = Surface(grid.surface)
-        self.loop = None
         self.ticks_per_cell = 12
-        self.action = None
+        self._loop = None
 
-    def edit(self, loop):
-        self.loop = loop
+    @property
+    def loop(self):
+        return self._loop
+
+    @loop.setter
+    def loop(self, value):
+        self._loop = value
         self.draw()
 
     def rc2cell(self, row, column):
@@ -288,6 +292,13 @@ class LoopEditor(Gridget):
         # Return list of ticks in a given cell
         cell = self.rc2cell(row, column)
         return range(cell*self.ticks_per_cell, (cell+1)*self.ticks_per_cell)
+
+
+class LoopEditor(CellPicker):
+
+    def __init__(self, grid):
+        super().__init__(grid)
+        self.action = None
 
     def draw(self):
         if self.loop is None:
@@ -328,7 +339,10 @@ class LoopEditor(Gridget):
             self.action = None
         else:
             ticks = self.rc2ticks(row, column)
-            if self.loop.tick_out-1 in ticks:
+            if self.loop.tick_out == 0 and 0 in ticks:
+                logging.info("Action is now SET_TICK_OUT (initial)")
+                self.action = "SET_TICK_OUT"
+            elif self.loop.tick_out-1 in ticks:
                 logging.info("Action is now SET_TICK_OUT")
                 self.action = "SET_TICK_OUT"
             elif self.loop.tick_in in ticks:
@@ -337,10 +351,85 @@ class LoopEditor(Gridget):
             else:
                 for tick in ticks:
                     for note in self.loop.notes.get(tick, []):
-                        # FIXME: Send node_off message when the pad is released
+                        # FIXME: Send note_off message when the pad is released
                         message = mido.Message(
                             "note_on", channel=self.loop.channel,
                             note=note.note, velocity=note.velocity)
                         self.grid.griode.synth.send(message)
                         self.grid.griode.synth.send(message.copy(velocity=0))
         self.draw()
+
+    def button_pressed(self, button):
+        if button == "UP":
+            self.grid.focus(self.grid.loopcontroller)
+        if button == "DOWN":
+            self.grid.loopcontroller.stepsequencer.loop = self.loop  # FIXME urgh
+            self.grid.focus(self.grid.loopcontroller.stepsequencer)
+
+class StepSequencer(CellPicker):
+
+    def __init__(self, grid):
+        super().__init__(grid)
+        self.note = None
+
+    @property
+    def notepicker(self):
+        return self.grid.notepickers[self.grid.channel]
+
+    def draw(self):
+        if self.loop is None:
+            return
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                if row in [1, 2, 3, 4]:
+                    color = self.notepicker.surface[led]
+                else:
+                    color = colors.BLACK
+                    ticks = self.rc2ticks(row, column)
+                    # Show if there are notes in this cell
+                    has_first = bool(self.loop.notes.get(ticks[0]))
+                    has_other = any(bool(self.loop.notes.get(tick))
+                                    for tick in ticks[1:])
+                    if has_first and has_other:
+                        color = colors.AMBER
+                    if has_first and not has_other:
+                        color = colors.GREEN
+                    if not has_first and has_other:
+                        color = colors.RED
+                    # And now, override that color if the current note is there
+                    for note in self.loop.notes.get(ticks[0], []):
+                        if note.note == self.note:
+                            color = colors.BLUE
+                    # But override even more to show the current play position
+                    if self.loop.looper.playing:
+                        if self.loop in (self.loop.looper.loops_playing |
+                                         self.loop.looper.loops_recording):
+                            if self.loop.next_tick in ticks:
+                                color = colors.PINK_HI
+                self.surface[led] = color
+
+    def pad_pressed(self, row, column, velocity):
+        if row in [1, 2, 3, 4]:
+            self.notepicker.pad_pressed(row, column, velocity)
+            self.note = self.notepicker.led2note[row, column]
+            self.draw()
+        else:
+            if velocity == 0:
+                return
+            if self.note is None:
+                return
+            ticks = self.rc2ticks(row, column)
+            for note in self.loop.notes.get(ticks[0], []):
+                if note.note == self.note:
+                    self.loop.notes[ticks[0]].remove(note)
+                    break
+            else:
+                if ticks[0] not in self.loop.notes:
+                    self.loop.notes[ticks[0]] = []
+                self.loop.notes[ticks[0]].append(
+                    Note(note=self.note, velocity=velocity, duration=self.ticks_per_cell))
+
+    def button_pressed(self, button):
+        if button == "UP":
+            self.grid.focus(self.grid.loopcontroller.loopeditor)
