@@ -23,6 +23,119 @@ class Loop(object):
         self.next_tick = 0  # next "position" to be played in self.notes
 
 
+class Flash(Gridget):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+
+    def flash(self, color):
+        for led in self.surface:
+            if isinstance(led, tuple):
+                self.surface[led] = color
+        self.grid.focus(self)
+        time.sleep(0.3)
+        self.grid.focus(self.grid.notepickers[self.grid.channel])
+
+
+class Teacher(object):
+
+    def __init__(self, looper):
+        self.looper = looper
+        self.teacher_loop = None
+        self.student_loop = Loop(looper, "student")
+        self.phase = "STOP"     # "TEACHER" "STUDENT"
+
+    def select(self, loop):
+        self.teacher_loop = loop
+        self.student_loop.channel = loop.channel
+        for grid in self.looper.griode.grids:
+            grid.channel = loop.channel
+            grid.focus(grid.notepickers[grid.channel])
+            grid.flash = Flash(grid)  # FIXME
+        self.tick_interval = 8 * 24  # Two bars
+        self.tick_in = 0
+        self.tick_out = self.tick_in + self.tick_interval
+        loop.tick_in = 0
+        loop.tick_out = 0       # Do not loop that!
+        self.flash(colors.YELLOW)
+        self.teacher()
+
+    def flash(self, color):
+        for grid in self.looper.griode.grids:
+            grid.flash.flash(color)
+
+    def stop(self):
+        self.phase = "STOP"
+        logging.debug("phase=STOP")
+        self.looper.playing = False
+        self.looper.loops_playing.clear()
+        self.looper.loops_recording.clear()
+
+    def teacher(self):
+        self.phase = "TEACHER"
+        logging.debug("phase=TEACHER")
+        self.looper.playing = False
+        self.looper.loops_recording.clear()
+        self.looper.loops_playing.clear()
+        self.looper.loops_playing.add(self.teacher_loop)
+        self.teacher_loop.next_tick = self.tick_in
+        self.teacher_notes = []
+        for tick in range(self.tick_in, self.tick_out):
+            for note in self.teacher_loop.notes.get(tick, []):
+                self.teacher_notes.append(note.note)
+        if self.teacher_notes == []:
+            # A silence long enough will be interpreted as end of song
+            self.stop()
+        else:
+            self.flash(colors.BLACK)
+            self.looper.playing = True
+
+    def student(self):
+        self.phase = "STUDENT" 
+        logging.debug("phase=STUDENT")
+        self.looper.playing = False
+        self.student_loop.notes.clear()
+        self.student_loop.next_tick = 0
+        self.looper.loops_recording.add(self.student_loop)
+        self.looper.loops_playing.clear()
+        self.flash(colors.YELLOW)
+        self.looper.playing = True
+    
+    def tick(self, tick):
+        if self.phase == "TEACHER":
+            if self.teacher_loop.next_tick >= self.tick_out:
+                self.student()
+        if self.phase == "STUDENT":
+            # Once per beat, check how we did in this loop
+            if tick%24 == 0:
+                student_notes = []
+                for tick in self.student_loop.notes:
+                    for note in self.student_loop.notes.get(tick, []):
+                        if note.duration > 0:
+                            student_notes.append(note.note)
+                if student_notes == self.teacher_notes:
+                    # Yay!
+                    logging.info("Got the right notes!")
+                    self.flash(colors.GREEN)
+                    self.tick_in += self.tick_interval
+                    self.tick_out += self.tick_interval
+                    self.teacher()
+                elif (any(x!=y for x,y in zip(self.teacher_notes, student_notes))
+                      or
+                      len(student_notes) > len(self.teacher_notes)
+                      or
+                      self.student_loop.next_tick >= 2*self.tick_interval):
+                    # Bzzzt wrong
+                    logging.info("Bzzzt try again!")
+                    logging.info("Teacher notes: {}"
+                                 .format(self.teacher_notes))
+                    logging.info("Student notes: {}"
+                                 .format(student_notes))
+                    self.flash(colors.RED)
+                    self.teacher()
+                
+    
 @persistent_attrs(beats_per_bar=4)
 class Looper(object):
 
@@ -36,6 +149,7 @@ class Looper(object):
         self.notes_recording = {}     # note -> (Note(), tick_when_started)
         self.notes_playing = []       # (stop_tick, channel, note)
         self.loops = {}
+        self.teacher = Teacher(self)
         for row in range(1, 9):
             for column in range(1, 9):
                 self.loops[row, column] = Loop(self, (row, column))
@@ -104,7 +218,8 @@ class Looper(object):
             # If we're past the end of the loop, jump to begin of loop
             if loop.tick_out > 0 and loop.next_tick >= loop.tick_out:
                 loop.next_tick = loop.tick_in
-
+        # Teacher logic
+        self.teacher.tick(tick)
 
 class LoopController(Gridget):
 
@@ -121,7 +236,7 @@ class LoopController(Gridget):
         self.surface = Surface(grid.surface)
         self.loopeditor = LoopEditor(grid)
         self.stepsequencer = StepSequencer(grid)
-        self.mode = "PLAY"   # or "REC"
+        self.mode = "LEARN"  # or "REC" or "PLAY"
         self.pads_held = {}  # maps pad to time when pressed
         self.draw()
 
@@ -203,6 +318,7 @@ class LoopController(Gridget):
         if (row, column) not in self.pads_held:
             return
         del self.pads_held[row, column]
+
         if self.mode == "PLAY":
             loop = self.looper.loops[row, column]
             # Does that loop actually exist?
@@ -211,6 +327,7 @@ class LoopController(Gridget):
                     self.looper.loops_playing.remove(loop)
                 else:
                     self.looper.loops_playing.add(loop)
+
         if self.mode == "REC":
             loop = self.looper.loops[row, column]
             # If we tapped an empty cell, create a new loop
@@ -221,6 +338,12 @@ class LoopController(Gridget):
             else:
                 self.looper.loops_recording.add(loop)
                 # FIXME: stop recording other loops on the same channel
+
+        if self.mode == "LEARN":
+            loop = self.looper.loops[row, column]
+            if loop.channel is not None:
+                self.looper.teacher.select(loop)
+                                     
         # Update all loopcontrollers to show new state
         for grid in self.grid.griode.grids:
             grid.loopcontroller.draw()
