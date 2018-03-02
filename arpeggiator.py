@@ -54,7 +54,7 @@ MOTIF: configure a melodic motif.
 
 
 class Page(enum.Enum):
-    MOTIFSETUP = 1
+    # FIXME MOTIFSETUP = 1
     ARPSETUP = 2
     VELOGATE = 3
     MOTIF = 4
@@ -279,8 +279,6 @@ class ArpConfig(Gridget):
             self.draw_steps()
         if self.page == Page.ARPSETUP:
             self.draw_arpsetup()
-        if self.page == Page.MOTIFSETUP:
-            self.draw_motifsetup()
 
     def draw_arpsetup(self):
         for led in self.surface:
@@ -353,6 +351,7 @@ class ArpConfig(Gridget):
         if velocity == 0:
             return
         step = column - 1 + self.display_offset
+
         if self.page == Page.VELOGATE:
             if row == 1:
                 while len(self.arpeggiator.pattern) <= step:
@@ -362,12 +361,14 @@ class ArpConfig(Gridget):
                 self.arpeggiator.pattern[step][1] = row-1
             if row in [5, 6, 7, 8]:
                 self.arpeggiator.pattern[step][0] = row-4
+
         if self.page == Page.MOTIF:
             harmony = row-1
             if harmony in self.arpeggiator.pattern[step][2]:
                 self.arpeggiator.pattern[step][2].remove(harmony)
             else:
                 self.arpeggiator.pattern[step][2].append(harmony)
+
         if self.page == Page.ARPSETUP:
             if (row, column) == (8, 1):
                 self.arpeggiator.enabled = not self.arpeggiator.enabled
@@ -380,16 +381,19 @@ class ArpConfig(Gridget):
             if row == 1:
                 self.arpeggiator.interval = [None, 24, 16, 12, 8, 6, 4, 3, 2][column]
 
-            self.draw()
+        self.draw()
 
     def button_pressed(self, button):
-        # FIXME: don't go up/down if we're already all the way up/down
-        if button == "UP":
-            self.page = Page(self.page.value-1)
-            self.draw()
-        if button == "DOWN":
-            self.page = Page(self.page.value+1)
-            self.draw()
+        try:
+            if button == "UP":
+                self.page = Page(self.page.value-1)
+                self.draw()
+            if button == "DOWN":
+                self.page = Page(self.page.value+1)
+                self.draw()
+        except ValueError:
+            # Ignore attempts to scroll up/down to non-existent pages
+            pass
         if button == "LEFT":
             if self.display_offset > 0:
                 self.display_offset -= 1
