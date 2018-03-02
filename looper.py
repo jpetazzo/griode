@@ -384,6 +384,9 @@ class StepSequencer(CellPicker):
                 row, column = led
                 if row in [1, 2, 3, 4]:
                     color = self.notepicker.surface[led]
+                    if self.note is not None:
+                        if self.note == self.notepicker.led2note[row, column]:
+                            color = colors.PINK_HI
                 else:
                     color = colors.BLACK
                     ticks = self.rc2ticks(row, column)
@@ -392,21 +395,21 @@ class StepSequencer(CellPicker):
                     has_other = any(bool(self.loop.notes.get(tick))
                                     for tick in ticks[1:])
                     if has_first and has_other:
-                        color = colors.AMBER
+                        color = colors.GREY_LO
                     if has_first and not has_other:
-                        color = colors.GREEN
+                        color = colors.WHITE
                     if not has_first and has_other:
-                        color = colors.RED
+                        color = colors.GREY_LO
                     # And now, override that color if the current note is there
                     for note in self.loop.notes.get(ticks[0], []):
                         if note.note == self.note:
-                            color = colors.BLUE
+                            color = colors.PINK_HI
                     # But override even more to show the current play position
                     if self.loop.looper.playing:
                         if self.loop in (self.loop.looper.loops_playing |
                                          self.loop.looper.loops_recording):
                             if self.loop.next_tick in ticks:
-                                color = colors.PINK_HI
+                                color = colors.AMBER_HI
                 self.surface[led] = color
 
     def pad_pressed(self, row, column, velocity):
