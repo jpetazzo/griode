@@ -49,7 +49,7 @@ class Fluidsynth(object):
             exit(1)
 
         popen_args = [
-            "fluidsynth", "-s", "-a", "alsa",
+            "fluidsynth", "-s", "-a", "pulseaudio",
              "-o", "synth.midi-bank-select=mma",
              "-o", "synth.sample-rate=44100",
              "-c", "8", "-p", "griode"

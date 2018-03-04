@@ -112,10 +112,9 @@ class DeviceChain(object):
         self.griode = griode
         self.channel = channel
         persistent_attrs_init(self, str(channel))
-        for message in self.instrument.messages():
-            self.griode.synth.send(message.copy(channel=channel))
         self.latch = Latch(self)
         self.arpeggiator = Arpeggiator(self)
+        self.program_change()
 
     # The variables `..._index` indicate which instrument is currently selected.
     # Note: perhaps this instrument does not exist. In that case, the
@@ -128,6 +127,14 @@ class DeviceChain(object):
         banks = instrs.get(self.instr_index, instrs[0])
         instrument = banks.get(self.bank_index, banks[0])
         return instrument
+
+    def program_change(self):
+        instrument = self.instrument
+        logging.info("Channel {} switching to instrument B{} P{}: {}"
+                     .format(self.channel, instrument.bank,
+                             instrument.program, instrument.name))
+        for message in instrument.messages():
+            self.send(message.copy(channel=self.channel))
 
     def send(self, message):
         self.latch.send(message)

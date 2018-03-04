@@ -272,13 +272,7 @@ class InstrumentPicker(Gridget):
         if row==4:
             self.devicechain.bank_index = col -1
         # Switch to new instrument
-        instrument = self.devicechain.instrument
-        logging.info("Switching channel {} to instrument B{} P{}: {}"
-                     .format(self.channel,
-                             instrument.bank, instrument.program,
-                             instrument.name))
-        for message in instrument.messages():
-            self.devicechain.send(message)
+        self.devicechain.program_change()
         # Repaint
         self.draw()
 
@@ -293,9 +287,9 @@ class InstrumentPicker(Gridget):
             instruments = self.grid.griode.synth.instruments
             instrument_index = instruments.index(self.devicechain.instrument)
             if button == "UP":
-                instrument_index += 1
-            else:
                 instrument_index -= 1
+            else:
+                instrument_index += 1
             if instrument_index < 0:
                 instrument = instruments[-1]
             elif instrument_index >= len(instruments):
@@ -306,8 +300,7 @@ class InstrumentPicker(Gridget):
                 self.devicechain.group_index = instrument.program//8
                 self.devicechain.instr_index = instrument.program%8
                 self.devicechain.bank_index = instrument.bank_index
-            for message in self.devicechain.instrument.messages():
-                self.devicechain.send(message)
+            self.devicechain.program_change()
             self.draw()
 
 
