@@ -17,7 +17,6 @@ class Note(object):
 @persistent_attrs(notes={}, channel=None, tick_in=0, tick_out=0)
 class Loop(object):
     def __init__(self, looper, cell):
-        logging.info("Loop.__init__()")
         self.looper = looper
         persistent_attrs_init(self, "{},{}".format(*cell))
         self.next_tick = 0  # next "position" to be played in self.notes

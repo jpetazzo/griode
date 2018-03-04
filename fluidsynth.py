@@ -1,7 +1,9 @@
 import glob
 import logging
 import mido
+import re
 import subprocess
+import time
 
 # When we start the fluidsynth process, we use "MMA" bank select mode.
 # This is the only mode that allows more than 128 banks (since it uses
@@ -31,6 +33,9 @@ class Instrument(object):
             mido.Message("program_change", program=self.program),
         ]
 
+    def __repr__(self):
+        return ("Instrument({0.font}, {0.program}, {0.bank}, {0.name})"
+                .format(self))
 
 class Fluidsynth(object):
 
@@ -43,51 +48,34 @@ class Fluidsynth(object):
             print("Suggestion: 'cd soundfonts; ./download-soundfonts.sh'")
             exit(1)
 
-        # Spawn fluidsynth process
-        self.fluidsynth = subprocess.Popen(
-            ["fluidsynth", "-a", "alsa",
+        popen_args = [
+            "fluidsynth", "-s", "-a", "alsa",
              "-o", "synth.midi-bank-select=mma",
              "-o", "synth.sample-rate=44100",
-             "-c", "8", "-p", "griode"],
-            stdin=subprocess.PIPE, stdout=subprocess.PIPE
-        )
+             "-c", "8", "-p", "griode"
+        ]
 
-        self.instruments = []
-
-        # Wait for fluidsynth prompt
-        while self.fluidsynth.stdout.peek() != b"> ":
-            self.fluidsynth.stdout.readline()
-
-        # Now load each sound font one by one
+        # Invoke fluidsynth a first time to enumerate instruments
+        self.fluidsynth = subprocess.Popen(
+            popen_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        msg = ""
         for i, soundfont in enumerate(soundfonts):
-            logging.debug("Loading soundfont {} in position {}"
-                          .format(soundfont, i))
             font_id = i+1
             offset = i*1000
-            self.fluidsynth.stdin.write("load {} 1 {}\n"
-                                        .format(soundfont, offset)
-                                        .encode("ascii"))
-            self.fluidsynth.stdin.flush()
-            self.fluidsynth.stdout.readline()
-            # Wait for prompt again
-            while self.fluidsynth.stdout.peek() != b"> ":
-                self.fluidsynth.stdout.readline()
-            # Enumerate instruments in the soundfont
-            self.fluidsynth.stdin.write("inst {}\n"
-                                        .format(font_id)
-                                        .encode("ascii"))
-            self.fluidsynth.stdin.flush()
-            self.fluidsynth.stdout.readline()
-            while self.fluidsynth.stdout.peek() != b"> ":
-                line = self.fluidsynth.stdout.readline()
-                bank_prog, program_name = line.split(b" ", 1)
-                bank, prog = [int(x) for x in bank_prog.split(b"-")]
-                name = program_name.decode("ascii").strip()
-                logging.debug("Adding instrument {} -> {} -> {}"
-                              .format(prog, bank, name))
-                self.instruments.append(Instrument(font_id, prog, bank, name))
+            msg += "load {} 1 {}\n".format(soundfont, offset)
+            msg += "inst {}\n".format(font_id)
+        stdout, stderr = self.fluidsynth.communicate(msg.encode("ascii"))
+        output = stdout.decode("ascii")
+        instruments = re.findall("\n([0-9]{3,})-([0-9]{3}) (.*)", output)
+        self.instruments = []
+        for bank, prog, name in instruments:
+            bank = int(bank)
+            prog = int(prog)
+            font_id = bank // 1000
+            instrument = Instrument(font_id, prog, bank, name)
+            self.instruments.append(instrument)
+        logging.info("Found {} instruments".format(len(self.instruments)))
 
-        # Build the fonts structure
         self.fonts = build_fonts(self.instruments)
 
         # Re-order the instruments list
@@ -96,17 +84,28 @@ class Fluidsynth(object):
             return (i.font_index, i.program, i.bank_index)
         self.instruments.sort(key=get_instrument_order)
 
+        # And now, restart fluidsynth but for actual synth use
+        self.fluidsynth = subprocess.Popen(
+            popen_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.fluidsynth.stdin.write(msg.encode("ascii"))
+        self.fluidsynth.stdin.flush()
+
         # Find the MIDI port created by fluidsynth and open it
-        fluidsynth_ports = [p for p in mido.get_output_names() if "griode" in p]
-        if len(fluidsynth_ports) == 0:
-            logging.error("Could not connect to fluidsynth!")
-            self.synth_port = None
+        deadline = time.time() + 5
+        while time.time() < deadline:
+            port_names = [p for p in mido.get_output_names() if "griode" in p]
+            if port_names == []:
+                time.sleep(0.1)
+                continue
+            if len(port_names) > 1:
+                logging.warning("Found more than one port for griode")
+            self.synth_port = mido.open_output(port_names[0])
+            logging.info("Connected to MIDI output {}"
+                                 .format(port_names[0]))
+            break
         else:
-            if len(fluidsynth_ports) > 1:
-                logging.warning("More that one MIDI output named 'griode' found!")
-            fluidsynth_port = fluidsynth_ports[0]
-            self.synth_port = mido.open_output(fluidsynth_port)
-            logging.info("Connected to MIDI output {}".format(fluidsynth_port))
+            logging.error("Failed to locate the fluidsynth port!")
+            exit(1)
 
     def send(self, message):
         self.synth_port.send(message)

@@ -273,6 +273,10 @@ class InstrumentPicker(Gridget):
             self.devicechain.bank_index = col -1
         # Switch to new instrument
         instrument = self.devicechain.instrument
+        logging.info("Switching channel {} to instrument B{} P{}: {}"
+                     .format(self.channel,
+                             instrument.bank, instrument.program,
+                             instrument.name))
         for message in instrument.messages():
             self.devicechain.send(message)
         # Repaint
