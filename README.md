@@ -13,8 +13,8 @@ have a LaunchPad connected to an Debian/Ubuntu system:
 ```
 git clone git://github.com/jpetazzo/griode
 cd griode
-sudo apt-get install python3-dev libasound2-dev libjack-dev fluidsynth
-pip install --user -r requirements.txt
+sudo apt-get install python3-pip python3-dev libasound2-dev libjack-dev fluidsynth
+pip3 install --user -r requirements.txt
 ( cd soundfonts; ./download-soundfonts.sh; )
 ./griode.py
 ```
