@@ -12,7 +12,8 @@ import colors
 from fluidsynth import Fluidsynth
 from latch import Latch, LatchConfig
 from looper import Looper, LoopController
-from gridgets import MENU, Menu, Mixer
+from gridgets import MENU, Menu
+from mixer import Faders, Mixer
 import notes
 from persistence import persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
@@ -34,6 +35,7 @@ class Griode(object):
         self.cpu = CPU(self)
         self.clock = Clock(self)
         self.looper = Looper(self)
+        self.mixer = Mixer(self)
         # FIXME: probably make this configurable somehow (env var...?)
         if False:
             from termpad import ASCIIGrid
@@ -75,7 +77,7 @@ class Grid(object):
         persistent_attrs_init(self, grid_name)
         self.surface_map = {}  # maps leds to gridgets
         self.colorpicker = ColorPicker(self)
-        self.mixer = Mixer(self)
+        self.faders = Faders(self)
         self.bpmsetter = BPMSetter(self)
         self.notepickers = [NotePicker(self, i) for i in range(16)]
         self.instrumentpickers = [InstrumentPicker(self, i) for i in range(16)]
