@@ -97,10 +97,7 @@ class Menu(Gridget):
                 self.grid.scalepicker,
             ],
             BUTTON_2 = [
-                "CHROMATIC",
-                "DIATONIC",
-                "MAGIC",
-                "DRUMKIT",
+                self.grid.notepickers,
             ],
             BUTTON_3 = [
                 self.grid.instrumentpickers,
@@ -123,25 +120,25 @@ class Menu(Gridget):
             else:
                 self.surface[button] = colors.ROSE
 
-    def focus(self, entry):
-        mode = None
-        if isinstance(entry, str):
-            mode = entry
-            entry = self.grid.notepickers
+    def button_pressed(self, button):
+        entries = self.menu[button]
+        if button == self.current:
+            # Cycle through the entries of one menu
+            entries.append(entries.pop(0))
+            cycle = True
+        else:
+            # Switch to another menu
+            self.current = button
+            cycle = False
+        entry = entries[0]
+        # Resolve the exact gridget
         if isinstance(entry, list):
             gridget = entry[self.grid.channel]
         else:
             gridget = entry
-        self.grid.focus(gridget)
-        if mode:
-            gridget.switch(mode)
-
-    def button_pressed(self, button):
-        if button == self.current:
-            entries = self.menu[button]
-            entries.append(entries.pop(0))
-            self.focus(entries[0])
+        # Special case for the notepicker
+        if len(entries) == 1 and cycle:
+            gridget.cycle()
         else:
-            self.current = button
-            self.focus(self.menu[button][0])
-        self.draw()
+            self.grid.focus(gridget)
+            self.draw()

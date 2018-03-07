@@ -1,4 +1,5 @@
 import collections
+import enum
 import logging
 import mido
 
@@ -8,40 +9,35 @@ from gridgets import Gridget, Surface, channel_colors
 from persistence import persistent_attrs, persistent_attrs_init
 
 
-FOUR_FOUR_MAP = [
-    [55, 49, 56, 57],
-    [41, 43, 47, 50],
-    [40, 38, 46, 53],
-    [37, 36, 42, 51],
-]
-FOUR_EIGHT_MAP = [
-    [49, 57, 55, 52, 53, 59, 51, None],
-    [50, 48, 47, 45, 43, 41, None, 46],
-    [40, 38, 37, None, 39, 54, None, 42],
-    [36, 35, None, None, 75, 56, None, 44],
-]
+DRUMKIT_MAPPINGS = dict(
+    FOUR_FOUR = [
+        [55, 49, 56, 57],
+        [41, 43, 47, 50],
+        [40, 38, 46, 53],
+        [37, 36, 42, 51],
+    ],
+    FOUR_EIGHT = [
+        [49, 57, 55, 52, 53, 59, 51, None],
+        [50, 48, 47, 45, 43, 41, None, 46],
+        [40, 38, 37, None, 39, 54, None, 42],
+        [36, 35, None, None, 75, 56, None, 44],
+    ],
+)
 
-##############################################################################
 
-class ColorPicker(Gridget):
+class Melodic(enum.Enum):
+    CHROMATIC = 1
+    DIATONIC = 2
+    MAGIC = 3
 
-    def __init__(self, grid):
-        self.grid = grid
-        self.surface = Surface(grid.surface)
-        for led in self.surface:
-            if isinstance(led, tuple):
-                row, column = led
-                color = (row-1)*8 + column-1
-                self.surface[led] = color
 
-    def pad_pressed(self, row, column, velocity):
-        if velocity > 0:
-            color = (row-1)*8 + column-1
-            print("Color #{} ({})".format(color, colors.by_number[color]))
+Drumkit = enum.Enum("Drumkit", list(DRUMKIT_MAPPINGS.keys()))
 
-##############################################################################
 
-@persistent_attrs(root=48, mapping="CHROMATIC")
+
+@persistent_attrs(root=48,
+                  drumkit_mapping=Drumkit.FOUR_EIGHT,
+                  melodic_mapping=Melodic.CHROMATIC)
 class NotePicker(Gridget):
 
     def __init__(self, grid, channel):
@@ -53,6 +49,11 @@ class NotePicker(Gridget):
         persistent_attrs_init(self, "{}__{}".format(self.grid.grid_name, channel))
         self.led2note = {}
         self.note2leds = collections.defaultdict(list)
+        devicechain = self.grid.griode.devicechains[self.grid.channel]
+        if devicechain.instrument.is_drumkit:
+            self.mapping = self.drumkit_mapping
+        else:
+            self.mapping = self.melodic_mapping
         self.switch()
 
     @property
@@ -63,16 +64,26 @@ class NotePicker(Gridget):
     def scale(self):
         return self.grid.griode.scale
 
-    def switch(self, mapping=None):
-        logging.info("NotePicker.switch({})".format(mapping))
-        if mapping is None:
-            mapping = self.mapping
+    def mode(self, is_drumkit):
+        if is_drumkit:
+            self.mapping = self.drumkit_mapping
         else:
-            self.mapping = mapping
+            self.mapping = self.melodic_mapping
+        self.switch()
+
+    def cycle(self):
+        m = self.mapping
+        try:
+            self.mapping = m.__class__(m.value+1)
+        except ValueError:
+            self.mapping = m.__class__(1)
+        self.switch()
+
+    def switch(self):
         # If we are in diatonic mode, we force the root key to be the root
         # of the scale, otherwise the whole screen will be off.
         # FIXME: allow to shift the diatonic mode.
-        if mapping == "DIATONIC":
+        if self.mapping == Melodic.DIATONIC:
             root = self.root//12 * 12 + self.grid.griode.key
         else:
             root = self.root
@@ -80,23 +91,24 @@ class NotePicker(Gridget):
         for led in self.surface:
             if isinstance(led, tuple):
                 row, column = led
-                if mapping == "CHROMATIC":
+                if self.mapping == Melodic.CHROMATIC:
                     shift = 5
                     note = shift*(row-1) + (column-1)
                     note += root
-                elif mapping == "DIATONIC":
+                elif self.mapping == Melodic.DIATONIC:
                     shift = 3
                     note = shift*(row-1) + (column-1)
                     octave = note//len(self.scale)
                     step = note%len(self.scale)
                     note = root + 12*octave + self.scale[step]
-                elif mapping == "MAGIC":
+                elif self.mapping == Melodic.MAGIC:
                     note = (column-1)*7 - (column-1)//2*12
                     note += (row-1)*4
                     note += root
-                elif mapping == "DRUMKIT":
+                elif isinstance(self.mapping, Drumkit):
+                    padmap = DRUMKIT_MAPPINGS[self.mapping.name]
                     try:
-                        note = FOUR_EIGHT_MAP[::-1][row-1][column-1]
+                        note = padmap[::-1][row-1][column-1]
                     except IndexError:
                         note = None
                 self.led2note[led] = note
@@ -116,7 +128,7 @@ class NotePicker(Gridget):
 
     def note2color(self, note):
         # For drumkit, just show which notes are mapped.
-        if self.mapping == "DRUMKIT":
+        if isinstance(self.mapping, Drumkit):
             if note is not None:
                 return channel_colors[self.channel]
             else:
@@ -249,10 +261,11 @@ class InstrumentPicker(Gridget):
                 (7-(group_index//8), 1+group_index%8),
                 (5, 1+instr_index),
                 (4, 1+instrument.bank_index)]:
-            leds[led] = colors.RED
+            leds[led] = colors.PINK_HI
         return leds
 
     def pad_pressed(self, row, col, velocity):
+        current_is_drumkit = self.devicechain.instrument.is_drumkit
         if row in [1, 2, 3]:
             self.grid.notepickers[self.channel].pad_pressed(row, col, velocity)
             return
@@ -274,6 +287,10 @@ class InstrumentPicker(Gridget):
         self.devicechain.program_change()
         # Repaint
         self.draw()
+        # If we switched from melodic to rhythmic, update NotePicker
+        new_is_drumkit = self.devicechain.instrument.is_drumkit
+        if current_is_drumkit != new_is_drumkit:
+            self.grid.notepickers[self.channel].mode(new_is_drumkit)
 
     def button_pressed(self, button):
         if button == "LEFT" and self.channel>0:
@@ -430,3 +447,21 @@ note2piano = [
 ]
 
 piano2note = { (r, c): n for (n, (r, c)) in enumerate(note2piano) }
+
+##############################################################################
+
+class ColorPicker(Gridget):
+
+    def __init__(self, grid):
+        self.grid = grid
+        self.surface = Surface(grid.surface)
+        for led in self.surface:
+            if isinstance(led, tuple):
+                row, column = led
+                color = (row-1)*8 + column-1
+                self.surface[led] = color
+
+    def pad_pressed(self, row, column, velocity):
+        if velocity > 0:
+            color = (row-1)*8 + column-1
+            print("Color #{} ({})".format(color, colors.by_number[color]))
