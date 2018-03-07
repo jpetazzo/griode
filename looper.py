@@ -8,18 +8,28 @@ from persistence import persistent_attrs, persistent_attrs_init
 
 
 class Note(object):
+
     def __init__(self, note, velocity, duration):
         self.note = note
         self.velocity = velocity
         self.duration = duration
 
+    def __repr__(self):
+        return ("Note(note={}, velocity={}, duration={})"
+                .format(self.note, self.velocity, self.duration))
+
 
 @persistent_attrs(notes={}, channel=None, tick_in=0, tick_out=0)
 class Loop(object):
+
     def __init__(self, looper, cell):
         self.looper = looper
+        self.cell = cell
         persistent_attrs_init(self, "{},{}".format(*cell))
         self.next_tick = 0  # next "position" to be played in self.notes
+
+    def __repr__(self):
+        return "Loop({})".format(self.cell)
 
 
 class Flash(Gridget):
@@ -158,16 +168,16 @@ class Looper(object):
             for loop in self.loops_recording:
                 if loop.channel == message.channel:
                     if message.velocity > 0:
-                        logging.info("Recording new note START")
                         note = Note(message.note, message.velocity, 0)
+                        logging.info("recording {}...".format(note))
                         if loop.next_tick not in loop.notes:
                             loop.notes[loop.next_tick] = []
                         loop.notes[loop.next_tick].append(note)
                         self.notes_recording[message.note] = (note, self.last_tick)
                     else:
-                        logging.info("Recording new note END")
                         note, tick_started = self.notes_recording.pop(message.note)
                         note.duration = self.last_tick - tick_started
+                        logging.info("recorded {}".format(note))
         # No matter what: let the message through the chain
         self.output(message)
 
@@ -177,15 +187,6 @@ class Looper(object):
         devicechain.send(message)
 
     def tick(self, tick):
-        # FIXME force a sync of loop data but spread that over time
-        row = tick % 10
-        column = tick//10 % 10
-        loop = self.loops.get((row, column))
-        if loop is not None:
-            if loop.channel is not None:
-                logging.debug("Syncing loop {},{} ({} ticks)"
-                              .format(row, column, len(loop.notes)))
-                loop.db.sync()
         self.last_tick = tick
         # First, check if there are notes that should be stopped.
         notes_to_stop = [note for note in self.notes_playing if note[0] <= tick]
@@ -204,6 +205,7 @@ class Looper(object):
         for loop in self.loops_playing:
             # Figure out which notes should be started *now*
             for note in loop.notes.get(loop.next_tick, []):
+                logging.info("Play {} from {}".format(note, loop))
                 self.notes_playing.append(
                     (tick+note.duration, loop.channel, note.note))
                 message = mido.Message(
@@ -376,13 +378,15 @@ class LoopController(Gridget):
                     loop.next_tick = loop.tick_in
                 # FIXME should we also undo the last recording?
         if button == "RIGHT":
-            # I'm not sure that this logic should be here,
-            # but it should be somewhere, so here we go...
-            # When stopping, if any loop doesn't have a
-            # tick_out point, add one. (By rounding up to
-            # the end of the bar.)
             if self.looper.playing:
                 for loop in self.looper.loops_recording:
+                    # Save! Save all the things!
+                    loop.db.sync()
+                    # I'm not sure that this logic should be here,
+                    # but it should be somewhere, so here we go...
+                    # When stopping, if any loop doesn't have a
+                    # tick_out point, add one. (By rounding up to
+                    # the end of the bar.)
                     if loop.tick_out == 0:
                         loop.tick_out = 24 * ((loop.tick_out + 23) // 24)
             # And then toggle the playing flag.

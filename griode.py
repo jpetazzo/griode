@@ -20,7 +20,8 @@ import scales
 
 
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
-logging.basicConfig(level=os.environ.get("LOG_LEVEL"), format=log_format)
+log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+logging.basicConfig(level=log_level, format=log_format)
 
 
 @persistent_attrs(key=notes.C, scale=scales.MAJOR)
