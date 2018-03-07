@@ -3,10 +3,12 @@
 import shelve
 import sys
 
-# 24 = quantize on quarter note
-# 12 = quantize on eigth note
-# etc.
-QUANTIZE = 6
+# QUANTIZE will be the accuracy of quantization.
+# E.g. 24 = quant to the quarter note.
+# Magic value of 0 = do nothing.
+filename, QUANTIZE = sys.argv[1:]
+
+QUANTIZE = int(QUANTIZE)
 
 db = shelve.open(sys.argv[1])
 
@@ -14,6 +16,8 @@ notes = db["notes"]
 
 
 def quantize(tick):
+    if QUANTIZE == 0:
+        return
     offset = tick % QUANTIZE
     if offset < QUANTIZE/2:
         new_tick = tick-offset
@@ -44,7 +48,7 @@ for tick, next_tick in zip(ticks, ticks[1:]):
             note.duration = quantize(next_tick - tick)
 
 for note in notes[ticks[-1]]:
-    if note.duration == 0:
+    if note.duration == 0 and QUANTIZE > 0:
         note.duration = 24
 
 ticks = sorted(notes.keys())
@@ -55,7 +59,7 @@ for src in ticks:
 
 ticks = sorted(notes.keys())
 first = ticks[0]
-if first > 0:
+if first > 0 and QUANTIZE > 0:
     for tick in ticks:
         move(tick, tick-first)
 
