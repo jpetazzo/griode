@@ -14,7 +14,7 @@ from looper import Looper, LoopController
 from gridgets import MENU, Menu
 from mixer import Faders, Mixer
 import notes
-from persistence import persistent_attrs, persistent_attrs_init
+from persistence import cache, persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
 
@@ -143,18 +143,29 @@ class DeviceChain(object):
 
 ##############################################################################
 
+PATTERN_SAVING = [(1, 1), (1, 2), (2, 1), (2, 2)]
+PATTERN_DONE = [(1, 1)]
+
+def show_pattern(griode, pattern, color_on, color_off):
+    for grid in griode.grids:
+        for led in grid.surface:
+            if led in pattern:
+                grid.surface[led] = color_on
+            else:
+                grid.surface[led] = color_off
+
+
 def main():
     griode = Griode()
     try:
         while True:
             griode.clock.once()
     except KeyboardInterrupt:
-        for grid in griode.grids:
-            for led in grid.surface:
-                if led == (1, 1):
-                    grid.surface[led] = colors.PINK
-                else:
-                    grid.surface[led] = colors.BLACK
+        show_pattern(griode, PATTERN_SAVING, colors.PINK, colors.BLACK)
+        for db in cache.values():
+            db.close()
+        show_pattern(griode, PATTERN_DONE, colors.PINK, colors.BLACK)
+
 
 
 if __name__ == "__main__":

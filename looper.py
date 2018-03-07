@@ -183,6 +183,8 @@ class Looper(object):
         loop = self.loops.get((row, column))
         if loop is not None:
             if loop.channel is not None:
+                logging.debug("Syncing loop {},{} ({} ticks)"
+                              .format(row, column, len(loop.notes)))
                 loop.db.sync()
         self.last_tick = tick
         # First, check if there are notes that should be stopped.
