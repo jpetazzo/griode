@@ -7,6 +7,20 @@ import scales
 from gridgets import Gridget, Surface, channel_colors
 from persistence import persistent_attrs, persistent_attrs_init
 
+
+FOUR_FOUR_MAP = [
+    [55, 49, 56, 57],
+    [41, 43, 47, 50],
+    [40, 38, 46, 53],
+    [37, 36, 42, 51],
+]
+FOUR_EIGHT_MAP = [
+    [49, 57, 55, 52, 53, 59, 51, None],
+    [50, 48, 47, 45, 43, 41, None, 46],
+    [40, 38, 37, None, 39, 54, None, 42],
+    [36, 35, None, None, 75, 56, None, 44],
+]
+
 ##############################################################################
 
 class ColorPicker(Gridget):
@@ -24,21 +38,6 @@ class ColorPicker(Gridget):
         if velocity > 0:
             color = (row-1)*8 + column-1
             print("Color #{} ({})".format(color, colors.by_number[color]))
-
-##############################################################################
-
-FOUR_FOUR_MAP = [
-    [55, 49, 56, 57],
-    [41, 43, 47, 50],
-    [40, 38, 46, 53],
-    [37, 36, 42, 51],
-]
-FOUR_EIGHT_MAP = [
-    [49, 57, 55, 52, 53, 59, 51, None],
-    [50, 48, 47, 45, 43, 41, None, 46],
-    [40, 38, 37, None, 39, 54, None, 42],
-    [36, 35, None, None, 75, 56, None, 44],
-]
 
 ##############################################################################
 

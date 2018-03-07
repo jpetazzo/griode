@@ -52,11 +52,12 @@ class Clock(object):
         # Compute when we're due next
         self.next += 60.0 / self.bpm / 24
         if now > self.next:
-            print("We're running late by {} seconds!".format(self.next-now))
+            logging.warning("We're running late by {} seconds!"
+                            .format(self.next-now))
             # If we are late, should we try to stay aligned, or skip?
             margin = 0.0  # Put 1.0 for pseudo-realtime
             if now > self.next + margin:
-                print("Catching up (deciding that next tick = now).")
+                logging.warning("Catching up (deciding that next tick = now).")
                 self.next = now
             return 0
         return self.next - now

@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 import logging
-import os
 import mido
+import os
 import time
 
-logging.basicConfig(level=os.environ.get("LOG_LEVEL"))
 
 from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
@@ -20,8 +19,8 @@ from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
 
 
-# Work around a persistence bug (this should eventually be removed)
-from looper import Note
+log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
+logging.basicConfig(level=os.environ.get("LOG_LEVEL"), format=log_format)
 
 
 @persistent_attrs(key=notes.C, scale=scales.MAJOR)
@@ -58,12 +57,13 @@ class Griode(object):
                 if klass is not None:
                     # FIXME find a better way than this for hotplug!
                     if tick > 1:
+                        logging.info("Detected hotplug of new device: {}".format(port_name))
                         time.sleep(4)
                     self.grids.append(klass(self, port_name))
             for port_name in configured_ports - detected_ports:
                 # Removing a device
-                logging.debug("Device {} is no longer plugged. Removing it."
-                              .format(port_name))
+                logging.info("Device {} is no longer plugged. Removing it."
+                             .format(port_name))
                 self.grids = [g for g in self.grids if g.grid_name != port_name]
 
 ##############################################################################

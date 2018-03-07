@@ -50,9 +50,9 @@ class Fluidsynth(object):
 
         popen_args = [
             "fluidsynth", "-s", "-a", "pulseaudio",
-             "-o", "synth.midi-bank-select=mma",
-             "-o", "synth.sample-rate=44100",
-             "-c", "8", "-p", "griode"
+            "-o", "synth.midi-bank-select=mma",
+            "-o", "synth.sample-rate=44100",
+            "-c", "8", "-p", "griode"
         ]
 
         # Invoke fluidsynth a first time to enumerate instruments
@@ -101,7 +101,7 @@ class Fluidsynth(object):
                 logging.warning("Found more than one port for griode")
             self.synth_port = mido.open_output(port_names[0])
             logging.info("Connected to MIDI output {}"
-                                 .format(port_names[0]))
+                         .format(port_names[0]))
             break
         else:
             logging.error("Failed to locate the fluidsynth port!")

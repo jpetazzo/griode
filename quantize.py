@@ -12,6 +12,7 @@ db = shelve.open(sys.argv[1])
 
 notes = db["notes"]
 
+
 def quantize(tick):
     offset = tick % QUANTIZE
     if offset < QUANTIZE/2:
@@ -22,12 +23,14 @@ def quantize(tick):
         print("Quantizing {} to {}".format(tick, new_tick))
     return new_tick
 
+
 def move(src, dst):
     print("{} -> {}".format(src, dst))
     if dst not in notes:
         notes[dst] = []
     notes[dst].extend(notes[src])
     del notes[src]
+
 
 ticks = sorted(notes.keys())
 for tick, next_tick in zip(ticks, ticks[1:]):
@@ -39,10 +42,11 @@ for tick, next_tick in zip(ticks, ticks[1:]):
         note.duration = quantize(note.duration)
         if note.duration == 0:
             note.duration = quantize(next_tick - tick)
+
 for note in notes[ticks[-1]]:
     if note.duration == 0:
         note.duration = 24
-       
+
 ticks = sorted(notes.keys())
 for src in ticks:
     dst = quantize(src)

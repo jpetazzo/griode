@@ -91,7 +91,7 @@ class Teacher(object):
             self.looper.playing = True
 
     def student(self):
-        self.phase = "STUDENT" 
+        self.phase = "STUDENT"
         logging.debug("phase=STUDENT")
         self.looper.playing = False
         self.student_loop.notes.clear()
@@ -100,7 +100,7 @@ class Teacher(object):
         self.looper.loops_playing.clear()
         self.flash(colors.YELLOW)
         self.looper.playing = True
-    
+
     def tick(self, tick):
         if self.phase == "TEACHER":
             if self.teacher_loop.next_tick >= self.tick_out:
@@ -120,7 +120,7 @@ class Teacher(object):
                     self.tick_in += self.tick_interval
                     self.tick_out += self.tick_interval
                     self.teacher()
-                elif (any(x!=y for x,y in zip(self.teacher_notes, student_notes))
+                elif (any(x!=y for x, y in zip(self.teacher_notes, student_notes))
                       or
                       len(student_notes) > len(self.teacher_notes)
                       or
@@ -133,8 +133,8 @@ class Teacher(object):
                                  .format(student_notes))
                     self.flash(colors.RED)
                     self.teacher()
-                
-    
+
+
 @persistent_attrs(beats_per_bar=4)
 class Looper(object):
 
@@ -342,7 +342,7 @@ class LoopController(Gridget):
             loop = self.looper.loops[row, column]
             if loop.channel is not None:
                 self.looper.teacher.select(loop)
-                                     
+
         # Update all loopcontrollers to show new state
         for grid in self.grid.griode.grids:
             grid.loopcontroller.draw()

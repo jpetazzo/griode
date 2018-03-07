@@ -15,7 +15,7 @@ class Page(enum.Enum):
 
 @persistent_attrs(volume=16*[96], chorus=16*[0], reverb=16*[0])
 class Mixer(object):
-    
+
     def __init__(self, griode):
         self.griode = griode
         persistent_attrs_init(self)
