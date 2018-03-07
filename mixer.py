@@ -19,6 +19,15 @@ class Mixer(object):
     def __init__(self, griode):
         self.griode = griode
         persistent_attrs_init(self)
+        # FIXME don't duplicate the CC mappings
+        for cc, array in [
+            (7, self.volume),
+            (91, self.chorus),
+            (93, self.reverb),
+        ]:
+            for channel, value in enumerate(array):
+                m = mido.Message("control_change", control=cc, value=value)
+                self.griode.devicechains[channel].send(m)
 
 
 class Faders(Gridget):
