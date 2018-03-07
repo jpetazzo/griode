@@ -128,7 +128,10 @@ export LOG_LEVEL=DEBUG
 ./griode.py
 ```
 
-Note: `DEBUG` level is (and will always be) very verbose.
+Note:
+- `DEBUG` level is (and will always be) very verbose.
+- You can put the log level in lowercase if you want.
+- The default log level is `INFO`.
 
 
 ### Persistence
@@ -136,4 +139,14 @@ Note: `DEBUG` level is (and will always be) very verbose.
 Griode saves all persistent information to the `state/` subdirectory.
 If you want to reset Griode (or some of its subsystems) to factory defaults,
 you can wipe out this directory (or some of the files therein).
+
+
+## Bugs
+
+- If you keep a note pressed while switching to another gridget,
+  the note will continue to play. This is almost by design.
+- If you keep a note pressed while stopping recording, it might
+  record a zero-length notes.
+- If a sync is triggered while notes are pressed, it might result
+  in zero-length notes.
 
