@@ -1,5 +1,6 @@
 import glob
 import logging
+import os
 import mido
 import re
 import subprocess
@@ -48,8 +49,33 @@ class Fluidsynth(object):
             print("Suggestion: 'cd soundfonts; ./download-soundfonts.sh'")
             exit(1)
 
+        # Try to detect which sound driver to use.
+        audio_driver = os.environ.get("GRIODE_AUDIO_DRIVER")
+        if audio_driver is None:
+            uid = os.getuid()
+            pulseaudio_pidfile = "/run/user/{}/pulse/pid".format(uid)
+            if os.path.isfile(pulseaudio_pidfile):
+                try:
+                    pulseaudio_pid = int(open(pulseaudio_pidfile).read())
+                except:
+                    logging.exception("Could not read pulseaudio PID")
+                    pulseaudio_pid = None
+                if pulseaudio_pid is not None:
+                    if os.path.isdir("/proc/{}".format(pulseaudio_pid)):
+                        audio_driver = "pulseaudio"
+        if audio_driver is None:
+            if sys.platform == "linux":
+                audio_driver = "alsa"
+            if sys.platform == "darwin":
+                audio_driver = "coreaudio"
+        if audio_driver is None:
+            logging.error("Could not determine audio driver.")
+            logging.error("Please set GRIODE_AUDIO_DRIVER.")
+            exit(1)
+        logging.info("Using audio driver: {}".format(audio_driver))
+
         popen_args = [
-            "fluidsynth", "-s", "-a", "pulseaudio",
+            "fluidsynth", "-s", "-a", audio_driver,
             "-o", "synth.midi-bank-select=mma",
             "-o", "synth.sample-rate=44100",
             "-c", "8", "-p", "griode"
