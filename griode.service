@@ -1,0 +1,17 @@
+# This is to be used on a Raspberry Pi, where the code is checked out
+# in /home/pi/griode. To install the unit:
+# systemctl enable $PWD/griode.service
+
+[Unit]
+Description=Griode
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+WorkingDirectory=/home/pi/griode
+ExecStart=/home/pi/griode/griode.py
+User=pi
+Group=audio
+Restart=always
+

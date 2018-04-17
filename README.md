@@ -141,6 +141,31 @@ If you want to reset Griode (or some of its subsystems) to factory defaults,
 you can wipe out this directory (or some of the files therein).
 
 
+### Starting automatically on boot
+
+If you are using a Raspberry Pi running the Raspbian distribution,
+and want to automatically start Griode on boot, you can use the provided
+systemd unit (`griode.service`).
+
+After checking out the code in `/home/pi/griode`, and confirming that
+it runs correctly, just run:
+
+```
+sudo systemctl enable /home/pi/griode/griode.service
+sudo systemctl start griode
+```
+
+Griode will start, and it will be automatically restarted when the
+Pi reboots.
+
+If it doesn't start, or if you want to see what's going on:
+
+```
+sudo systemctl status griode
+sudo journalctl -u griode
+```
+
+
 ## Bugs
 
 - If you keep a note pressed while switching to another gridget,
