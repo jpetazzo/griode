@@ -4,6 +4,7 @@ import os
 import mido
 import re
 import subprocess
+import sys
 import time
 
 # When we start the fluidsynth process, we use "MMA" bank select mode.
