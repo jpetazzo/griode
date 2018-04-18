@@ -106,6 +106,9 @@ class Grid(object):
             # Draw it
             self.surface[led] = gridget.surface[led]
 
+    def tick(self, tick):
+        pass
+
 ##############################################################################
 
 @persistent_attrs(font_index=0, group_index=0, instr_index=0, bank_index=0)

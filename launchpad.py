@@ -57,6 +57,14 @@ class LaunchPad(Grid):
             if message.value == 127:
                 gridget.button_pressed(led)
 
+    def tick(self, tick):
+        # This is a hack to work around a bug on the Raspberry Pi.
+        # Sometimes, when no message has been sent for a while (a
+        # few seconds), outgoing MIDI messages seem to be delayed,
+        # causing a perceptible lag in visual feedback. It doesn't
+        # happen if we keep sending messages continuously.
+        self.grid_out.send(mido.Message("active_sensing"))
+
 
 class LPSurface(object):
 

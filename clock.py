@@ -38,6 +38,8 @@ class Clock(object):
         for devicechain in self.griode.devicechains:
             devicechain.arpeggiator.tick(self.tick)
         for grid in self.griode.grids:
+            grid.tick(self.tick)
+        for grid in self.griode.grids:
             grid.loopcontroller.tick(self.tick)
         self.griode.looper.tick(self.tick)
         self.griode.cpu.tick(self.tick)
