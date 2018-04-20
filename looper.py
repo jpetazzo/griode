@@ -244,6 +244,10 @@ class LoopController(Gridget):
         self.pads_held = {}  # maps pad to time when pressed
         self.draw()
 
+    def cycle(self):
+        self.looper.teacher.stop()
+        self.grid.focus(self)
+
     @property
     def looper(self):
         return self.grid.griode.looper
@@ -299,6 +303,7 @@ class LoopController(Gridget):
 
     def tick(self, tick):
         for cell, time_pressed in self.pads_held.items():
+            break # code disabled for kids mode
             if time.time() > time_pressed + 1.0:
                 self.pads_held.clear()
                 # Enter edit mode for that pad
@@ -353,6 +358,7 @@ class LoopController(Gridget):
             grid.loopcontroller.draw()
 
     def button_pressed(self, button):
+        return # Code disabled for kids mode
         if button == "UP":
             self.mode = "PLAY"
         if button == "DOWN":

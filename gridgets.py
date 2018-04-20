@@ -94,19 +94,19 @@ class Menu(Gridget):
         self.menu = dict(
             BUTTON_1 = [
                 self.grid.loopcontroller,
-                self.grid.scalepicker,
+                #self.grid.scalepicker,
             ],
             BUTTON_2 = [
                 self.grid.notepickers,
             ],
             BUTTON_3 = [
                 self.grid.instrumentpickers,
-                self.grid.arpconfigs,
-                self.grid.latchconfigs,
+                #self.grid.arpconfigs,
+                #self.grid.latchconfigs,
             ],
             BUTTON_4 = [
-                self.grid.colorpicker,
-                self.grid.faders,
+                #self.grid.colorpicker,
+                #self.grid.faders,
                 self.grid.bpmsetter,
             ],
         )
