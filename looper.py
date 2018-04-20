@@ -19,7 +19,8 @@ class Note(object):
                 .format(self.note, self.velocity, self.duration))
 
 
-@persistent_attrs(notes={}, channel=None, tick_in=0, tick_out=0)
+@persistent_attrs(
+    notes={}, channel=None, tick_in=0, tick_out=0, teach_interval=0)
 class Loop(object):
 
     def __init__(self, looper, cell):
@@ -62,7 +63,7 @@ class Teacher(object):
             grid.channel = loop.channel
             grid.focus(grid.notepickers[grid.channel])
             grid.flash = Flash(grid)  # FIXME
-        self.tick_interval = 8 * 24  # Two bars
+        self.tick_interval = loop.teach_interval or 24 * 8
         self.tick_in = 0
         self.tick_out = self.tick_in + self.tick_interval
         loop.tick_in = 0
