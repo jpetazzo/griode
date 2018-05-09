@@ -43,6 +43,7 @@ class Griode(object):
 
     def tick(self, tick):
         from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
+        from keyboard import Keyboard
         if tick%100 == 1:
             configured_ports = { grid.grid_name for grid in self.grids }
             detected_ports = set(mido.get_ioport_names())
@@ -55,6 +56,8 @@ class Griode(object):
                     klass = LaunchpadMK2
                 if "Launchpad S" in port_name:
                     klass = LaunchpadS
+                if "reface" in port_name:
+                    klass = Keyboard
                 if klass is not None:
                     # FIXME find a better way than this for hotplug!
                     if tick > 1:
