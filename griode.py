@@ -56,6 +56,8 @@ class Griode(object):
                     klass = LaunchpadMK2
                 if "Launchpad S" in port_name:
                     klass = LaunchpadS
+                if "Launchpad Mini" in port_name:
+                    klass = LaunchpadS
                 if "reface" in port_name:
                     klass = Keyboard
                 if klass is not None:
