@@ -8,7 +8,7 @@ For short demos and tutorials, check this [YouTube playlist](https://www.youtube
 ## Quick start
 
 Here are some quick instructions to get you started, assuming that you
-have a LaunchPad connected to an Debian/Ubuntu system:
+have a LaunchPad connected to an Debian/Ubuntu system.
 
 ```
 git clone git://github.com/jpetazzo/griode
@@ -21,6 +21,18 @@ pip3 install --user -r requirements.txt
 
 Your LaunchPad should light up with a red and white pattern, and pressing
 pads should make piano sounds.
+
+
+### Installing on a Raspberry Pi
+
+If you want to setup Griode on a Raspberry Pi, you can use the
+instructions above, but **make sure that you run them as the `pi` user.**
+
+You can use the "lite" (text only) or the "desktop" version, it
+doesn't matter for Griode.
+
+If you want Griode to start automatically when the Pi is powered on,
+see [this paragraph](#Starting-automatically-on-boot).
 
 
 ## Detailed setup instructions
