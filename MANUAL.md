@@ -103,3 +103,60 @@ Here is the menu structure:
   - rainbow palette
   - volume, chorus, and reverb faders
   - tempo
+
+
+## Instrument selector
+
+When you go to the instrument selector, the grid will
+be divided in two zones. The five rows on top are used
+to select the instrment, and the three remaining row on
+the bottom let you play notes (so that you can test the
+instrument without having to continuously switch back and
+forth between the instrument selector and the keyboard).
+
+The top five rows have the following roles.
+
+- The top row lets you select the SoundFont that you wish
+  to use, and whether you want to pick a melodic patch
+  or a drum kit. If you only have one SoundFont, you should
+  see two buttons lit up: the first one to select a melodic
+  patch, the second one to select a drum kit. Now, if you
+  have two SoundFonts, you will see four buttons. They will
+  let you choose (in this order) melodic instruments from
+  the first file, melodic instruments from the second file,
+  drums from the first file, drums from the second file.
+  Each additional file adds two buttons here, one for melodic
+  and the other for drum patches.
+- The second and third rows let you select the family of
+  instrument (for melodic instruments only). The list
+  of families is available in the [GM specification](
+  https://www.midi.org/specifications-old/item/gm-level-1-sound-set
+  ). Of course, if you use a SoundFont that doesn't follow
+  General MIDI conventions, this mapping will have a different
+  meaning.
+- The fourth row lets you select the individual instrument
+  within the family.
+- The fifth row lets you select the variation (when available)
+  for a specific instrument. Most instruments will have
+  only one version (and therefore, that fifth row will only
+  have one active button) but some can have more.
+
+
+## Loading SoundFonts
+
+Griode automatically loads sound fonts from `soundfonts/?.sf2`.
+The download script will automatically download a couple
+of sound fonts, and create symlinks named `0.sf2` and `1.sf2`
+pointing to these files.
+
+The recommended way to select which sound fonts to use is to
+place them all in the `soundfonts` directory (or anywhere else)
+and then create symlinks in the `soundfonts` directory.
+
+Example:
+
+- Download some super cool SF2 file named `steinway.sf2`
+- Copy `steinway.sf2` to the `soundfonts` directory
+- `cd soundfonts; ln -s steinway.sf2 2.sf2`
+- And voilà, that SF2 file will be loaded next time you start Griode!
+
