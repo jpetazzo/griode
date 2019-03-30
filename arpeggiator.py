@@ -2,7 +2,6 @@ import enum
 import logging
 import mido
 
-import colors
 from gridgets import Gridget, Surface
 from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
@@ -286,14 +285,14 @@ class ArpConfig(Gridget):
             if isinstance(led, tuple):
                 color = palette.BLACK
                 if led == (8, 1):
-                    color = on_off_colors[self.arpeggiator.enabled]
+                    color = palette.SWITCH[self.arpeggiator.enabled]
                 row, column = led
 
                 def color_enum(klass, column, value):
                     if column == value:
-                        return colors.PINK_HI
+                        return palette.SWITCH[1]
                     if column in [e.value for e in klass]:
-                        return colors.ROSE
+                        return palette.SWITCH[0]
                     return palette.BLACK
 
                 if row == 6:
@@ -316,36 +315,36 @@ class ArpConfig(Gridget):
                 step = column - 1 + self.display_offset
                 if step >= self.arpeggiator.pattern_length:
                     if row == 1:
-                        color = colors.GREEN_LO
+                        color = palette.TRIG
                 else:
                     velocity, gate, harmonies = self.arpeggiator.pattern[step]
                     if self.page == Page.VELOGATE:
                         if row == 1:
                             if step == self.current_step:
-                                color = colors.AMBER
+                                color = palette.PLAY
                             else:
-                                color = colors.GREEN_HI
+                                color = palette.TRIG[1]
                         if row in [2, 3, 4]:
                             if gate > row-2:
                                 if harmonies:
-                                    color = colors.SPRING
+                                    color = palette.GATE[1]
                                 else:
-                                    color = colors.GREY_LO
+                                    color = palette.GATE[0]
                         if row in [5, 6, 7, 8]:
                             if velocity > row-5:
                                 if harmonies:
-                                    color = colors.LIME
+                                    color = palette.VELO[1]
                                 else:
-                                    color = colors.GREY_LO
+                                    color = palette.VELO[0]
                     if self.page == Page.MOTIF:
                         if row-1 in harmonies:
                             if step == self.current_step:
-                                color = colors.AMBER
+                                color = palette.PLAY
                             else:
                                 if velocity < 2:
-                                    color = colors.GREY_LO
+                                    color = palette.MOTIF[0]
                                 else:
-                                    color = colors.GREEN
+                                    color = palette.MOTIF[1]
                 self.surface[led] = color
 
     def pad_pressed(self, row, column, velocity):

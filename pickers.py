@@ -3,7 +3,6 @@ import enum
 import logging
 import mido
 
-import colors
 import scales
 from gridgets import Gridget, Surface
 from palette import palette
@@ -349,19 +348,19 @@ class ScalePicker(Gridget):
                 row, column = led
                 color = palette.BLACK
                 if row == 8 and column in [1, 2, 4, 5, 6]:
-                    color = colors.MAGENTA_PINK
+                    color = palette.SCALEROOT
                 if row == 7 and column != 8:
-                    color = colors.MAGENTA_PINK
+                    color = palette.SCALEROOT
                 if row == 5 and column in [1, 2, 4, 5, 6]:
-                    color = colors.BLUE_ORCHID
+                    color = palette.SCALENOTES
                 if row == 4 and column != 8:
-                    color = colors.BLUE_ORCHID
+                    color = palette.SCALENOTES
                 if row == 4 and column == 8:
-                    color = colors.GREEN
+                    color = palette.TRIG
                 if row == 2 or row == 1:
                     try:
                         scales.palette[row-1][column-1]
-                        color = colors.SKY_OCEAN
+                        color = palette.SCALEPICK
                     except IndexError:
                         pass
                 self.surface[led] = color
@@ -372,17 +371,17 @@ class ScalePicker(Gridget):
         key = self.grid.griode.key
 
         row, column = note2piano[key]
-        leds[row+6, column] = colors.RED
+        leds[row+6, column] = palette.ACTIVE
 
         current_scale = self.grid.griode.scale
         for note in current_scale:
             row, column = note2piano[note]
-            leds[row+3, column] = colors.RED
+            leds[row+3, column] = palette.ACTIVE
 
         for row, line in enumerate(scales.palette):
             for column, scale in enumerate(line):
                 if scale == tuple(current_scale):
-                    leds[row+1, column+1] = colors.RED
+                    leds[row+1, column+1] = palette.ACTIVE
 
         return leds
 
@@ -465,4 +464,4 @@ class ColorPicker(Gridget):
     def pad_pressed(self, row, column, velocity):
         if velocity > 0:
             color = (row-1)*8 + column-1
-            print("Color #{} ({})".format(color, colors.by_number[color]))
+            print("Color #{}".format(color))

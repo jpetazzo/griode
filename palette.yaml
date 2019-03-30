@@ -177,3 +177,16 @@ COLORS:
   DIGIT:
     RGB: [ PINK, RED, WHITE, BLUE ]
     RG: [ R1G1, R3G0, R3G3, R0G3 ]
+
+  # Scale picker
+  SCALEROOT:
+    RGB: [ MAGENTA_PINK ]
+    RG: [ R1G0 ]
+
+  SCALENOTES:
+    RGB: [ BLUE_ORCHID ]
+    RG: [ R1G0 ]
+
+  SCALEPICK:
+    RGB: [ GREEN ]
+    RG: [ R1G0 ]
