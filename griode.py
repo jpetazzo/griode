@@ -36,41 +36,49 @@ class Griode(object):
         self.clock = Clock(self)
         self.looper = Looper(self)
         self.mixer = Mixer(self)
+        self.detect_devices()
         # FIXME: probably make this configurable somehow (env var...?)
         if False:
             from termpad import ASCIIGrid
             self.grids.append(ASCIIGrid(self, 0, 1))
 
     def tick(self, tick):
+        pass
+
+    def detect_devices(self, initial=True):
         from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
         from keyboard import Keyboard
-        if tick%100 == 1:
-            configured_ports = { grid.grid_name for grid in self.grids }
+        logging.debug("Enumerating MIDI ports...")
+        configured_ports = { grid.grid_name for grid in self.grids }
+        try:
             detected_ports = set(mido.get_ioport_names())
-            for port_name in detected_ports - configured_ports:
-                # Detected a new device! Yay!
-                klass = None
-                if "Launchpad Pro MIDI 2" in port_name:
-                    klass = LaunchpadPro
-                if "Launchpad MK2" in port_name:
-                    klass = LaunchpadMK2
-                if "Launchpad S" in port_name:
-                    klass = LaunchpadS
-                if "Launchpad Mini" in port_name:
-                    klass = LaunchpadS
-                if "reface" in port_name:
-                    klass = Keyboard
-                if klass is not None:
-                    # FIXME find a better way than this for hotplug!
-                    if tick > 1:
-                        logging.info("Detected hotplug of new device: {}".format(port_name))
-                        time.sleep(4)
-                    self.grids.append(klass(self, port_name))
-            for port_name in configured_ports - detected_ports:
-                # Removing a device
-                logging.info("Device {} is no longer plugged. Removing it."
-                             .format(port_name))
-                self.grids = [g for g in self.grids if g.grid_name != port_name]
+        except:
+            logging.exception("Error while enumerating MIDI ports")
+            detected_ports = set()
+        for port_name in detected_ports - configured_ports:
+            # Detected a new device! Yay!
+            klass = None
+            if "Launchpad Pro MIDI 2" in port_name:
+                klass = LaunchpadPro
+            if "Launchpad MK2" in port_name:
+                klass = LaunchpadMK2
+            if "Launchpad S" in port_name:
+                klass = LaunchpadS
+            if "Launchpad Mini" in port_name:
+                klass = LaunchpadS
+            if "reface" in port_name:
+                klass = Keyboard
+            if klass is not None:
+                # FIXME find a better way than this for hotplug!
+                if not initial:
+                    logging.info("Detected hotplug of new device: {}".format(port_name))
+                    time.sleep(4)
+                self.grids.append(klass(self, port_name))
+        for port_name in configured_ports - detected_ports:
+            # Removing a device
+            logging.info("Device {} is no longer plugged. Removing it."
+                         .format(port_name))
+            self.grids = [g for g in self.grids if g.grid_name != port_name]
 
 ##############################################################################
 

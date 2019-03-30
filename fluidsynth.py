@@ -76,13 +76,14 @@ class Fluidsynth(object):
         logging.info("Using audio driver: {}".format(audio_driver))
 
         popen_args = [
-            "fluidsynth", "-s", "-a", audio_driver,
+            "fluidsynth", "-a", audio_driver,
             "-o", "synth.midi-bank-select=mma",
             "-o", "synth.sample-rate=44100",
             "-c", "8", "-p", "griode"
         ]
 
         # Invoke fluidsynth a first time to enumerate instruments
+        logging.debug("Invoking fluidsynth to enumerate instruments...")
         self.fluidsynth = subprocess.Popen(
             popen_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         msg = ""
@@ -91,8 +92,10 @@ class Fluidsynth(object):
             offset = i*1000
             msg += "load {} 1 {}\n".format(soundfont, offset)
             msg += "inst {}\n".format(font_id)
-        stdout, stderr = self.fluidsynth.communicate(msg.encode("ascii"))
-        output = stdout.decode("ascii")
+        self.fluidsynth.stdin.write(msg.encode("ascii"))
+        self.fluidsynth.stdin.flush()
+        self.fluidsynth.stdin.close()
+        output = self.fluidsynth.stdout.read().decode("ascii")
         instruments = re.findall("\n([0-9]{3,})-([0-9]{3}) (.*)", output)
         self.instruments = []
         for bank, prog, name in instruments:
@@ -112,12 +115,14 @@ class Fluidsynth(object):
         self.instruments.sort(key=get_instrument_order)
 
         # And now, restart fluidsynth but for actual synth use
+        logging.debug("Starting fluidsynth as a synthesizer...")
         self.fluidsynth = subprocess.Popen(
             popen_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.fluidsynth.stdin.write(msg.encode("ascii"))
         self.fluidsynth.stdin.flush()
 
         # Find the MIDI port created by fluidsynth and open it
+        logging.debug("Waiting for fluidsynth MIDI port to show up...")
         deadline = time.time() + 5
         while time.time() < deadline:
             port_names = [p for p in mido.get_output_names() if "griode" in p]

@@ -45,6 +45,8 @@ class Clock(object):
         self.griode.cpu.tick(self.tick)
         self.griode.tick(self.tick)
 
+    # Return how long it is until the next tick.
+    # (Or zero if the next tick is due now, or overdue.)
     def poll(self):
         now = time.time()
         if now < self.next:
@@ -64,6 +66,7 @@ class Clock(object):
             return 0
         return self.next - now
 
+    # Wait until next tick is due.
     def once(self):
         time.sleep(self.poll())
 
