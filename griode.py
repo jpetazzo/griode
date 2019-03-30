@@ -7,13 +7,13 @@ import time
 
 from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
-import colors
 from fluidsynth import Fluidsynth
 from latch import Latch, LatchConfig
 from looper import Looper, LoopController
 from gridgets import MENU, Menu
 from mixer import Faders, Mixer
 import notes
+from palette import palette
 from persistence import cache, persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
@@ -178,10 +178,10 @@ def main():
         while True:
             griode.clock.once()
     except KeyboardInterrupt:
-        show_pattern(griode, PATTERN_SAVING, colors.PINK, colors.BLACK)
+        show_pattern(griode, PATTERN_SAVING, palette.ACTIVE, palette.BLACK)
         for db in cache.values():
             db.close()
-        show_pattern(griode, PATTERN_DONE, colors.PINK, colors.BLACK)
+        show_pattern(griode, PATTERN_DONE, palette.ACTIVE, palette.BLACK)
 
 
 

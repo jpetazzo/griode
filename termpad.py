@@ -32,7 +32,7 @@ class ASCIISurface(object):
     def __setitem__(self, led, color):
         # This is a janky map but it will do for now
         char = {
-            colors.BLACK:   " ",
+            palette.BLACK:   " ",
             colors.PINK_HI: "X",
             colors.ROSE:    ".",
             colors.GREY_LO: ".",

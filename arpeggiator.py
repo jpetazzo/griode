@@ -3,7 +3,8 @@ import logging
 import mido
 
 import colors
-from gridgets import Gridget, Surface, channel_colors, on_off_colors
+from gridgets import Gridget, Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
 """
@@ -264,10 +265,10 @@ class ArpConfig(Gridget):
         self.display_offset = 0  # Step shown on first column
         self.page = Page.VELOGATE
         self.surface = Surface(grid.surface)
-        self.surface["UP"] = channel_colors[self.channel]
-        self.surface["DOWN"] = channel_colors[self.channel]
-        self.surface["LEFT"] = channel_colors[self.channel]
-        self.surface["RIGHT"] = channel_colors[self.channel]
+        self.surface["UP"] = palette.CHANNEL[self.channel]
+        self.surface["DOWN"] = palette.CHANNEL[self.channel]
+        self.surface["LEFT"] = palette.CHANNEL[self.channel]
+        self.surface["RIGHT"] = palette.CHANNEL[self.channel]
         self.draw()
 
     @property
@@ -283,7 +284,7 @@ class ArpConfig(Gridget):
     def draw_arpsetup(self):
         for led in self.surface:
             if isinstance(led, tuple):
-                color = colors.BLACK
+                color = palette.BLACK
                 if led == (8, 1):
                     color = on_off_colors[self.arpeggiator.enabled]
                 row, column = led
@@ -293,7 +294,7 @@ class ArpConfig(Gridget):
                         return colors.PINK_HI
                     if column in [e.value for e in klass]:
                         return colors.ROSE
-                    return colors.BLACK
+                    return palette.BLACK
 
                 if row == 6:
                     color = color_enum(NoteOrder, column,
@@ -310,7 +311,7 @@ class ArpConfig(Gridget):
     def draw_steps(self):
         for led in self.surface:
             if isinstance(led, tuple):
-                color = colors.BLACK
+                color = palette.BLACK
                 row, column = led
                 step = column - 1 + self.display_offset
                 if step >= self.arpeggiator.pattern_length:

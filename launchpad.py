@@ -75,6 +75,10 @@ class LPSurface(object):
         return self.launchpad.led2message.__iter__()
 
     def __setitem__(self, led, color):
+        if isinstance(color, int):
+            logging.warning("Raw color used: launchpad[{}] = {}".format(led, color))
+        else:
+            color = color[self.launchpad.palette]
         message_type, parameter = self.launchpad.led2message[led]
         if message_type == "NOTE":
             message = mido.Message("note_on", note=parameter, velocity=color)
@@ -85,6 +89,7 @@ class LPSurface(object):
 
 class LaunchpadPro(LaunchPad):
 
+    palette = "RGB"
     message2led = {}
     led2message = {}
     for row in range(1, 9):
@@ -107,6 +112,7 @@ class LaunchpadPro(LaunchPad):
 
 class LaunchpadMK2(LaunchPad):
 
+    palette = "RGB"
     message2led = {}
     led2message = {}
 
@@ -125,6 +131,7 @@ class LaunchpadMK2(LaunchPad):
 
 class LaunchpadS(LaunchPad):
 
+    palette = "RG"
     message2led = {}
     led2message = {}
 

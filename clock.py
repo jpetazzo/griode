@@ -2,8 +2,9 @@ import logging
 import resource
 import time
 
-import colors
+
 from gridgets import Gridget, Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
 
@@ -99,10 +100,10 @@ class BPMSetter(Gridget):
     def __init__(self, grid):
         self.grid = grid
         self.surface = Surface(grid.surface)
-        self.surface[1, 1] = colors.ROSE
-        self.surface[1, 3] = colors.ROSE
-        self.surface[1, 6] = colors.ROSE
-        self.surface[1, 8] = colors.ROSE
+        self.surface[1, 1] = palette.DIGIT[0]
+        self.surface[1, 3] = palette.DIGIT[0]
+        self.surface[1, 6] = palette.DIGIT[0]
+        self.surface[1, 8] = palette.DIGIT[0]
         self.draw()
 
     @property
@@ -120,13 +121,13 @@ class BPMSetter(Gridget):
         if d1 == 0:
             for row in range(3, 9):
                 for column in [1, 8]:
-                    self.surface[row, column] = colors.BLACK
-            self.draw_digit(d2, 3, 2, colors.WHITE)
-            self.draw_digit(d3, 3, 5, colors.BLUE_HI)
+                    self.surface[row, column] = palette.BLACK
+            self.draw_digit(d2, 3, 2, palette.DIGIT[2])
+            self.draw_digit(d3, 3, 5, palette.DIGIT[3])
         else:
-            self.draw_digit(d1, 3, 1, colors.RED)
-            self.draw_digit(d2, 3, 3, colors.WHITE)
-            self.draw_digit(d3, 3, 6, colors.BLUE_HI)
+            self.draw_digit(d1, 3, 1, palette.DIGIT[1])
+            self.draw_digit(d2, 3, 3, palette.DIGIT[2])
+            self.draw_digit(d3, 3, 6, palette.DIGIT[3])
 
     def draw_digit(self, digit, row, column, color):
         for line in range(5):
@@ -135,7 +136,7 @@ class BPMSetter(Gridget):
                 if three_dots[dot] == "#":
                     draw_color = color
                 else:
-                    draw_color = colors.BLACK
+                    draw_color = palette.BLACK
                 draw_row = row + 4 - line
                 draw_column = column + dot
                 self.surface[draw_row, draw_column] = draw_color

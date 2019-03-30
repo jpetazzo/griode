@@ -2,8 +2,8 @@ import enum
 import logging
 import mido
 
-import colors
-from gridgets import channel_colors, on_off_colors, Gridget, Surface
+from gridgets import Gridget, Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
 
@@ -68,9 +68,9 @@ class Faders(Gridget):
                 channel = self.first_channel + column - 1
                 value = self.array[channel]
                 n_leds = (value+16)//16
-                color = colors.BLACK
+                color = palette.BLACK
                 if row <= n_leds:
-                    color = channel_colors[channel]
+                    color = palette.CHANNEL[channel]
                 self.surface[led] = color
 
     def pad_pressed(self, row, column, velocity):

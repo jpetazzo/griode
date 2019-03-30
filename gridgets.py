@@ -1,6 +1,6 @@
 import logging
 
-import colors
+from palette import palette
 
 ##############################################################################
 
@@ -8,27 +8,6 @@ import colors
 
 ARROWS = "UP DOWN LEFT RIGHT".split()
 MENU = "BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()
-
-channel_colors = [
-    colors.RED_HI,
-    colors.AMBER_HI,
-    colors.YELLOW_HI,
-    colors.GREEN_HI,
-    colors.SKY_HI,
-    colors.BLUE_HI,
-    colors.ORCHID_HI,
-    colors.MAGENTA_HI,
-    colors.RED_LO,
-    colors.AMBER_LO,
-    colors.YELLOW_LO,
-    colors.GREEN_LO,
-    colors.SKY_LO,
-    colors.BLUE_LO,
-    colors.ORCHID_LO,
-    colors.MAGENTA_LO,
-]
-
-on_off_colors = {True: colors.PINK_HI, False: colors.ROSE}
 
 ##############################################################################
 
@@ -38,7 +17,7 @@ class Surface(object):
         # Initialize our "framebuffer"
         self.leds = {}
         for led in parent:
-            self.leds[led] = colors.BLACK
+            self.leds[led] = palette.BLACK
         # Setup the masked surface
         # (By default, it filters out all display)
         self.parent = MaskedSurface(parent)
@@ -116,9 +95,9 @@ class Menu(Gridget):
     def draw(self):
         for button in self.menu:
             if button == self.current:
-                self.surface[button] = colors.PINK_HI
+                self.surface[button] = palette.MENU[1]
             else:
-                self.surface[button] = colors.ROSE
+                self.surface[button] = palette.MENU[0]
 
     def button_pressed(self, button):
         entries = self.menu[button]

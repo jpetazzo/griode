@@ -5,7 +5,8 @@ import mido
 
 import colors
 import scales
-from gridgets import Gridget, Surface, channel_colors
+from gridgets import Gridget, Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
 
@@ -44,7 +45,7 @@ class NotePicker(Gridget):
         self.grid = grid
         self.surface = Surface(grid.surface)
         for button in "UP DOWN LEFT RIGHT".split():
-            self.surface[button] = channel_colors[channel]
+            self.surface[button] = palette.CHANNEL[channel]
         self.channel = channel
         persistent_attrs_init(self, "{}__{}".format(self.grid.grid_name, channel))
         self.led2note = {}
@@ -130,16 +131,16 @@ class NotePicker(Gridget):
         # For drumkit, just show which notes are mapped.
         if isinstance(self.mapping, Drumkit):
             if note is not None:
-                return channel_colors[self.channel]
+                return palette.CHANNEL[self.channel]
             else:
-                return colors.BLACK
+                return palette.BLACK
 
         # For other layouts, properly show notes that are in scale.
         if self.is_key(note):
-            return channel_colors[self.channel]
+            return palette.CHANNEL[self.channel]
         if self.is_in_scale(note):
-            return colors.GREY_LO
-        return colors.BLACK
+            return palette.INSCALE[self.channel]
+        return palette.BLACK
 
     def draw(self):
         for led in self.surface:
@@ -183,9 +184,9 @@ class NotePicker(Gridget):
             if message.velocity == 0:
                 color = self.note2color(message.note)
             elif source_object == self:
-                color = colors.RED
+                color = palette.PLAY[0]
             else:
-                color = colors.AMBER
+                color = palette.PLAY[1]
             leds = self.note2leds[message.note]
             for led in leds:
                 self.surface[led] = color
@@ -198,12 +199,12 @@ class InstrumentPicker(Gridget):
         self.grid = grid
         self.channel = channel
         self.surface = Surface(grid.surface)
-        self.surface["UP"] = channel_colors[channel]
-        self.surface["DOWN"] = channel_colors[channel]
+        self.surface["UP"] = palette.CHANNEL[channel]
+        self.surface["DOWN"] = palette.CHANNEL[channel]
         if channel > 0:
-            self.surface["LEFT"] = channel_colors[channel-1]
+            self.surface["LEFT"] = palette.CHANNEL[channel-1]
         if channel < 15:
-            self.surface["RIGHT"] = channel_colors[channel+1]
+            self.surface["RIGHT"] = palette.CHANNEL[channel+1]
         self.draw()
 
     @property
@@ -232,20 +233,20 @@ class InstrumentPicker(Gridget):
             if led in leds:
                 self.surface[led] = leds[led]
             elif isinstance(led, tuple):
-                color = colors.BLACK
+                color = palette.BLACK
                 row, column = led
                 if row == 8:
                     font_index = column-1
                     if font_index in self.fonts:
-                        color = colors.ROSE
+                        color = palette.BANK[0]
                 if row in [6, 7]:
-                    color = colors.AMBER_YELLOW
+                    color = palette.GROUP[0]
                 if row == 5:
-                    color = colors.LIME_GREEN
+                    color = palette.INSTR[0]
                 if row == 4:
                     bank_index = column-1
                     if bank_index in self.banks:
-                        color = colors.CYAN_SKY
+                        color = palette.VAR[0]
                 if row in [1, 2, 3]:
                     color = self.grid.notepickers[self.channel].surface[led]
                 self.surface[led] = color
@@ -261,7 +262,7 @@ class InstrumentPicker(Gridget):
                 (7-(group_index//8), 1+group_index%8),
                 (5, 1+instr_index),
                 (4, 1+instrument.bank_index)]:
-            leds[led] = colors.PINK_HI
+            leds[led] = palette.ACTIVE
         return leds
 
     def pad_pressed(self, row, col, velocity):
@@ -271,7 +272,7 @@ class InstrumentPicker(Gridget):
             return
         if velocity == 0:
             return
-        if self.surface[row, col] == colors.BLACK:
+        if self.surface[row, col] == palette.BLACK:
             return
         if row==8:
             self.devicechain.font_index = col-1
@@ -346,7 +347,7 @@ class ScalePicker(Gridget):
                 self.surface[led] = leds[led]
             elif isinstance(led, tuple):
                 row, column = led
-                color = colors.BLACK
+                color = palette.BLACK
                 if row == 8 and column in [1, 2, 4, 5, 6]:
                     color = colors.MAGENTA_PINK
                 if row == 7 and column != 8:

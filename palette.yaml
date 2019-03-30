@@ -1,0 +1,179 @@
+# See palette.py for an explanation of this format.
+
+PALETTES:
+  # Palette for the Launchpad RGB and Launchpad Pro
+  RGB:
+    BLACK: 0
+    GREY_LO: 1
+    GREY_MD: 2
+    WHITE: 3
+    ROSE: 4
+    RED_HI: 5
+    RED: 6
+    RED_LO: 7
+    RED_AMBER: 8
+    AMBER_HI: 9
+    AMBER: 10
+    AMBER_LO: 11
+    AMBER_YELLOW: 12
+    YELLOW_HI: 13
+    YELLOW: 14
+    YELLOW_LO: 15
+    YELLOW_LIME: 16
+    LIME_HI: 17
+    LIME: 18
+    LIME_LO: 19
+    LIME_GREEN: 20
+    GREEN_HI: 21
+    GREEN: 22
+    GREEN_LO: 23
+    GREEN_SPRING: 24
+    SPRING_HI: 25
+    SPRING: 26
+    SPRING_LO: 27
+    SPRING_TURQUOISE: 28
+    TURQUOISE_LO: 29
+    TURQUOISE: 30
+    TURQUOISE_HI: 31
+    TURQUOISE_CYAN: 32
+    CYAN_HI: 33
+    CYAN: 34
+    CYAN_LO: 35
+    CYAN_SKY: 36
+    SKY_HI: 37
+    SKY: 38
+    SKY_LO: 39
+    SKY_OCEAN: 40
+    OCEAN_HI: 41
+    OCEAN: 42
+    OCEAN_LO: 43
+    OCEAN_BLUE: 44
+    BLUE_HI: 45
+    BLUE: 46
+    BLUE_LO: 47
+    BLUE_ORCHID: 48
+    ORCHID_HI: 49
+    ORCHID: 50
+    ORCHID_LO: 51
+    ORCHID_MAGENTA: 52
+    MAGENTA_HI: 53
+    MAGENTA: 54
+    MAGENTA_LO: 55
+    MAGENTA_PINK: 56
+    PINK_HI: 57
+    PINK: 58
+    PINK_LO: 59
+
+  # Palette for the Launchpad S and Launchpad Mini
+  # (It just has red and green leds, and they can
+  # have 4 intensity levels, where 0=OFF 3=MAX.)
+  RG:
+    R0G0: 0
+    R1G0: 1
+    R2G0: 2
+    R3G0: 3
+    R0G1: 16
+    R1G1: 17
+    R2G1: 18
+    R3G1: 19
+    R0G2: 32
+    R1G2: 33
+    R2G2: 34
+    R3G2: 35
+    R0G3: 48
+    R1G3: 49
+    R2G3: 50
+    R3G3: 51
+
+COLORS:
+
+  BLACK:
+    RGB: [ BLACK ]
+    RG: [ R0G0 ]
+
+  ACTIVE:
+    RGB: [ PINK_HI ]
+    RG: [ R3G3 ]
+
+  # CHANNEL = colors of the 16 MIDI channels.
+  # For the RG palette, we use the same 8 colors twice.
+  CHANNEL: &channels
+    RGB: [ RED_HI, AMBER_HI, YELLOW_HI, GREEN_HI,
+           SKY_HI, BLUE_HI, ORCHID_HI, MAGENTA_HI,
+           RED_LO, AMBER_LO, YELLOW_LO, GREEN_LO,
+           SKY_LO, BLUE_LO, ORCHID_LO, MAGENTA_LO ]
+    RG: [ R3G0, R3G2, R2G3, R0G3,
+          R2G0, R2G1, R1G2, R0G2,
+          R3G0, R3G2, R2G3, R0G3,
+          R2G0, R2G1, R1G2, R0G2 ]
+
+  # ROOT = colors to use for the root key of the scale.
+  # For now, it is the same color as the channel.
+  ROOT: *channels
+
+  # Which color to use to displays notes that are within
+  # the scale. It is a paler color.
+  INSCALE:
+    RGB: [ GREY_MD, GREY_MD, GREY_MD, GREY_MD, 
+           GREY_MD, GREY_MD, GREY_MD, GREY_MD, 
+           GREY_MD, GREY_MD, GREY_MD, GREY_MD, 
+           GREY_MD, GREY_MD, GREY_MD, GREY_MD ]
+    RG: [ R0G1, R0G1, R1G0, R1G0, 
+          R0G1, R0G1, R1G0, R1G0, 
+          R0G1, R0G1, R1G0, R1G0, 
+          R0G1, R0G1, R1G0, R1G0 ]
+
+  # Which color to use to indicate notes being played.
+  # The first color = notes played by us, the second
+  # color = notes played by other mechanisms.
+  PLAY:
+    RGB: [ WHITE, AMBER ]
+    RG: [ R3G3, R1G1 ]
+
+  # The following colors are OFF/ON for various sections.
+  MENU:
+    RGB: [ ROSE, PINK_HI ]
+    RG: [ R1G0, R3G0 ]
+
+  SWITCH:
+    RGB: [ ROSE, PINK_HI ]
+    RG: [ R1G0, R3G0 ]
+
+  # Instrument picker
+  BANK:
+    RGB: [ ROSE, PINK_HI ]
+    RG: [ R1G0, R3G0 ]
+
+  GROUP:
+    RGB: [ AMBER_YELLOW, PINK_HI ]
+    RG: [ R0G1, R0G3 ]
+
+  INSTR:
+    RGB: [ LIME_GREEN, PINK_HI ]
+    RG: [ R1G0, R3G0 ]
+
+  VAR:
+    RGB: [ CYAN_SKY, PINK_HI ]
+    RG: [ R0G1, R0G3 ]
+
+  # Arpeggiator
+  VELO:
+    RGB: [ GREY_LO, LIME ]
+    RG: [ R0G1, R0G3 ]
+
+  GATE:
+    RGB: [ GREY_LO, SPRING ]
+    RG: [ R1G0, R3G0 ]
+
+  TRIG:
+    RGB: [ GREY_LO, GREEN_HI ]
+    RG: [ R0G1, R0G3 ]
+
+  MOTIF:
+    RGB: [ GREY_LO, GREEN_HI ]
+    RG: [ R0G1, R0G3 ]
+
+  # BPM / tempo setter
+  DIGIT:
+    RGB: [ PINK, RED, WHITE, BLUE ]
+    RG: [ R1G1, R3G0, R3G3, R0G3 ]

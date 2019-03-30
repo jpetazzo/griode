@@ -1,6 +1,7 @@
 import mido
 
-from gridgets import Surface, on_off_colors
+from gridgets import Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
 
@@ -51,7 +52,7 @@ class LatchConfig(object):
         return self.grid.griode.devicechains[self.channel].latch
 
     def draw(self):
-        self.surface[7, 2] = on_off_colors[self.latch.enabled]
+        self.surface[7, 2] = palette.SWITCH[self.latch.enabled]
 
     def pad_pressed(self, row, column, velocity):
         if velocity == 0:

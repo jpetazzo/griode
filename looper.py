@@ -3,8 +3,12 @@ import mido
 import time
 
 import colors
-from gridgets import Gridget, Surface, channel_colors, on_off_colors
+from gridgets import Gridget, Surface
+from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
+
+
+on_off_colors = palette.SWITCH
 
 
 class Note(object):
@@ -98,7 +102,7 @@ class Teacher(object):
             # A silence long enough will be interpreted as end of song
             self.stop()
         else:
-            self.flash(colors.BLACK)
+            self.flash(palette.BLACK)
             self.looper.playing = True
 
     def student(self):
@@ -260,12 +264,12 @@ class LoopController(Gridget):
                 play = False
         if play:
             if tick % 24 > 18:
-                return colors.BLACK
+                return palette.BLACK
             else:
                 return color
         if rec:
             if tick % 12 > 4:
-                return colors.BLACK
+                return palette.BLACK
             else:
                 return color
         return color
@@ -276,7 +280,7 @@ class LoopController(Gridget):
                 color = colors.GREY_LO
                 loop = self.looper.loops[led]
                 if loop.channel is not None:
-                    color = channel_colors[loop.channel]
+                    color = palette.CHANNEL[loop.channel]
                     # If that loop is selected for play or rec, show it
                     # (With fancy blinking)
                     color = self.blink(
@@ -435,7 +439,7 @@ class LoopEditor(CellPicker):
         for led in self.surface:
             if isinstance(led, tuple):
                 row, column = led
-                color = colors.BLACK
+                color = palette.BLACK
                 ticks = self.rc2ticks(row, column)
                 for tick in ticks:
                     if tick in self.loop.notes:
@@ -444,7 +448,7 @@ class LoopEditor(CellPicker):
                     if self.loop in (self.loop.looper.loops_playing |
                                      self.loop.looper.loops_recording):
                         if self.loop.next_tick in ticks:
-                            color = channel_colors[self.loop.channel]
+                            color = palette.CHANNEL[self.loop.channel]
                 if self.loop.tick_in in ticks:
                     color = colors.PINK_HI
                 if self.loop.tick_out-1 in ticks:
@@ -517,7 +521,7 @@ class StepSequencer(CellPicker):
                         if self.note == self.notepicker.led2note[row, column]:
                             color = colors.PINK_HI
                 else:
-                    color = colors.BLACK
+                    color = palette.BLACK
                     ticks = self.rc2ticks(row, column)
                     # Show if there are notes in this cell
                     has_first = bool(self.loop.notes.get(ticks[0]))
