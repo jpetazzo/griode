@@ -42,16 +42,16 @@ class Sequencer(object):
                                 note=note.data.note,
                                 velocity=note.data.velocity
                                 )
-                            self.output(message)
+                            looper.output(message)
                     # Also stop notes that should be stopped
                     for note, deadline in looper.notes_playing.items():
-                        if deadline > tick:
+                        if tick > deadline:
                             message = mido.Message(
                                 "note_on",
                                 note=note,
                                 velocity=0
                                 )
-                            self.output(message)
+                            looper.output(message)
 
 
 class Looper(object):
@@ -68,6 +68,14 @@ class Looper(object):
         message.channel = self.channel
         devicechain = self.sequencer.griode.devicechains[self.channel]
         devicechain.send(message)
+        # Send event to notepickers so that they can update LEDs if necessary
+        for grid in self.sequencer.griode.grids:
+            notepicker = grid.notepickers[self.channel]
+            notepicker.send(message, self)
+        # Update widgets (FIXME: this expensive, can we do better?)
+        for grid in self.sequencer.griode.grids:
+            controller = grid.sequencercontrollers[self.channel]
+            controller.draw()
 
 
 @persistent_attrs(notes=intervaltree.IntervalTree(), duration=24*8)
@@ -109,7 +117,7 @@ class SequencerController(Gridget):
         self.draw()
 
     def tick(self, tick):
-    	pass # FIXME: update display?
+        pass # FIXME: update display?
 
     def button_pressed(self, button):
         if button == "UP":
@@ -129,7 +137,7 @@ class SequencerController(Gridget):
                 if not self.sequencer.playing:
                     # Sequencer was not playing, so we need to start it :)
                     self.sequencer.playing = True
-                    self.sequencer.time_ref = self.sequencer.last_tick
+                    self.sequencer.time_ref = self.sequencer.last_tick + 1
         if button == "DOWN":
             # options
             FIXME
