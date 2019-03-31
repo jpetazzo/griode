@@ -41,8 +41,9 @@ class Clock(object):
         for grid in self.griode.grids:
             grid.tick(self.tick)
         for grid in self.griode.grids:
-            grid.loopcontroller.tick(self.tick)
-        self.griode.looper.tick(self.tick)
+            for sequencercontroller in grid.sequencercontrollers:
+                sequencercontroller.tick(self.tick)
+        self.griode.sequencer.tick(self.tick)
         self.griode.cpu.tick(self.tick)
         self.griode.tick(self.tick)
 

@@ -72,7 +72,7 @@ class Menu(Gridget):
         self.surface = Surface(grid.surface)
         self.menu = dict(
             BUTTON_1 = [
-                self.grid.loopcontroller,
+                self.grid.sequencercontrollers,
                 self.grid.scalepicker,
             ],
             BUTTON_2 = [

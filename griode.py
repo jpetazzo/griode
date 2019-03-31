@@ -9,7 +9,6 @@ from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
 from fluidsynth import Fluidsynth
 from latch import Latch, LatchConfig
-from looper import Looper, LoopController
 from gridgets import MENU, Menu
 from mixer import Faders, Mixer
 import notes
@@ -17,6 +16,7 @@ from palette import palette
 from persistence import cache, persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
+from sequencer import Sequencer, SequencerController
 
 
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
@@ -34,7 +34,7 @@ class Griode(object):
         self.grids = []
         self.cpu = CPU(self)
         self.clock = Clock(self)
-        self.looper = Looper(self)
+        self.sequencer = Sequencer(self)
         self.mixer = Mixer(self)
         self.detect_devices()
         # FIXME: probably make this configurable somehow (env var...?)
@@ -98,7 +98,7 @@ class Grid(object):
         self.scalepicker = ScalePicker(self)
         self.arpconfigs = [ArpConfig(self, i) for i in range(16)]
         self.latchconfigs = [LatchConfig(self, i) for i in range(16)]
-        self.loopcontroller = LoopController(self)
+        self.sequencercontrollers = [SequencerController(self, i) for i in range(16)]
         self.menu = Menu(self)
         self.focus(self.menu, MENU)
         self.focus(self.notepickers[self.channel])
