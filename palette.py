@@ -38,7 +38,7 @@ class Palette(object):
 				for i, real_color_name in enumerate(real_colors_names):
 					if i not in cycle:
 						cycle[i] = dict()
-						cycle[i][""] = i
+						cycle[i][""] = "{}[{}]".format(color_name, i)
 					real_palette = data["PALETTES"][real_palette_name]
 					cycle[i][real_palette_name] = real_palette[real_color_name]
 			# This allows to use palette.FOO to access palette.FOO[0]
