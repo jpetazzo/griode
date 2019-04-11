@@ -4,6 +4,13 @@ Griode lets you play music using a LaunchPad or a similar controller.
 
 For short demos and tutorials, check this [YouTube playlist](https://www.youtube.com/playlist?list=PLBAFXs0YjviK9PzKnr3MDsRU6YAJgeH1K).
 
+I gave a few talks about Griode:
+- Berlin Hack&Tell at C-Base (May 2018) [🔗](https://berlinhackandtell.rocks/2018-05-29-no61-revolutionary-may-hacks)
+- Linux Technologies Berlin (July 2018) [🔗](https://www.meetup.com/linux-technologies-berlin/events/252302070/)
+- Python Users Berlin (April 2019) [🔗](https://www.meetup.com/Python-Users-Berlin-PUB/events/258989401/)
+
+[Here are the slides](https://docs.google.com/presentation/d/1G0bdcSyqqoCiD4dK7tq6PZsoMaM_VVexx_n8m4kSYYE/edit#slide=id.p) that I use when presenting Griode.
+
 There is a basic (and incomplete) [user manual](MANUAL.md) that
 you may (or not) find helpful. The videos might be more useful for
 the time being ...
