@@ -127,7 +127,7 @@ COLORS:
   # The first color = notes played by us, the second
   # color = notes played by other mechanisms.
   PLAY:
-    RGB: [ WHITE, AMBER ]
+    RGB: [ PINK_HI, ROSE ]
     RG: [ R3G3, R1G1 ]
 
   # The following colors are OFF/ON for various sections.
