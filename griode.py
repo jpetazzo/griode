@@ -141,10 +141,10 @@ class DeviceChain(object):
     @property
     def instrument(self):
         fonts = self.griode.synth.fonts
-        groups = fonts.get(self.font_index, fonts[0])
-        instrs = groups.get(self.group_index, groups[0])
-        banks = instrs.get(self.instr_index, instrs[0])
-        instrument = banks.get(self.bank_index, banks[0])
+        groups = fonts.get(self.font_index, fonts[None])
+        instrs = groups.get(self.group_index, groups[None])
+        banks = instrs.get(self.instr_index, instrs[None])
+        instrument = banks.get(self.bank_index, banks[None])
         return instrument
 
     def program_change(self):

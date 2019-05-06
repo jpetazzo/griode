@@ -216,15 +216,15 @@ class InstrumentPicker(Gridget):
 
     @property
     def groups(self):
-        return self.fonts.get(self.devicechain.font_index, self.fonts[0])
+        return self.fonts.get(self.devicechain.font_index, self.fonts[None])
 
     @property
     def instrs(self):
-        return self.groups.get(self.devicechain.group_index, self.groups[0])
+        return self.groups.get(self.devicechain.group_index, self.groups[None])
 
     @property
     def banks(self):
-        return self.instrs.get(self.devicechain.instr_index, self.instrs[0])
+        return self.instrs.get(self.devicechain.instr_index, self.instrs[None])
 
     def draw(self):
         leds = self.get_leds()

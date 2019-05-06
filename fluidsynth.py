@@ -203,6 +203,18 @@ def build_fonts(instruments):
 
     fonts = [font for ((is_drumkit, fs_font), font) in fonts]
     fonts = dict(enumerate(fonts))
+
+    # Add a None key to all dicts, to be used as a fallback value
+    for font_index in fonts:
+        groups = fonts[font_index]
+        for group_index in groups:
+            instrs = groups[group_index]
+            for instr_index in instrs:
+                banks = instrs[instr_index]
+                banks[None] = banks[min(banks)]
+            instrs[None] = instrs[min(instrs)]
+        groups[None] = groups[min(groups)]
+    fonts[None] = fonts[min(fonts)]
     return fonts
 
     # fonts[font_index=0..N][group=0..15][program=0..7][bank_index=0..N]
