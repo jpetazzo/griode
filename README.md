@@ -4,9 +4,14 @@ Griode lets you play music using a LaunchPad or a similar controller.
 
 For short demos and tutorials, check this [YouTube playlist](https://www.youtube.com/playlist?list=PLBAFXs0YjviK9PzKnr3MDsRU6YAJgeH1K).
 
-There is a basic (and incomplete) [user manual](MANUAL.md) that
-you may (or not) find helpful. The videos might be more useful for
-the time being ...
+This [poster](https://drive.google.com/file/d/16wTihPzhnTIVcAFDvHevtFG-0K0qXPPB)
+explains how to switch instruments and modes.
+The original version of the poster was made by Jérôme Petazzoni to
+present at PyCon in 2019; and it was then much improved
+by [Elodie Trinh](https://twitter.com/mintismycolor) (thanks Elodie!♥).
+
+There is also a basic (and incomplete) [user manual](MANUAL.md) that
+you may (or not) find helpful.
 
 
 ## Quick start
