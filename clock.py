@@ -88,7 +88,7 @@ class CPU(object):
         new_time = time.time()
         if new_time > self.last_shown + 1.0:
             percent = (new_usage-self.last_usage)/(new_time-self.last_time)
-            logging.debug("CPU usage: {:.2%}".format(percent))
+            # logging.debug("CPU usage: {:.2%}".format(percent))
             self.last_shown = new_time
         self.last_usage = new_usage
         self.last_time = new_time
