@@ -46,7 +46,7 @@ class Griode(object):
         pass
 
     def detect_devices(self, initial=True):
-        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
+        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS, LaunchpadX
         from keyboard import Keyboard
         logging.debug("Enumerating MIDI ports...")
         configured_ports = { grid.grid_name for grid in self.grids }
@@ -64,6 +64,8 @@ class Griode(object):
                 klass = LaunchpadMK2
             if "Launchpad S" in port_name:
                 klass = LaunchpadS
+            if "Launchpad X" in port_name:
+                klass = LaunchpadX
             if "Launchpad Mini" in port_name:
                 klass = LaunchpadS
             if "reface" in port_name:
