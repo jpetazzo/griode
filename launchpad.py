@@ -16,6 +16,7 @@ class LaunchPad(Grid):
         self.surface = LPSurface(self)
         Grid.__init__(self, griode, port_name)
         self.grid_in.callback = self.process_message
+        logging.debug("grid_in {}".format(self.grid_in))
 
     def process_message(self, message):
         logging.debug("{} got message {}".format(self, message))
@@ -87,6 +88,7 @@ class LPSurface(object):
 
 
 class LaunchpadPro(LaunchPad):
+    logging.debug("...")
 
     palette = "RGB"
     message2led = {}
@@ -109,6 +111,7 @@ class LaunchpadPro(LaunchPad):
     ]
 
 class LaunchpadX(LaunchPad):
+    logging.debug("...")
 
     palette = "RGB"
     message2led = {}
@@ -126,7 +129,9 @@ class LaunchpadX(LaunchPad):
     setup = [
         # This SysEx message switches the LaunchPad Pro to "programmer" mode
         mido.Message("sysex", data=[0, 32, 41, 2, 12, 14, 1]),
-        # And this one sets the front/side LED
+        #mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]),
+
+        # # And this one sets the front/side LED
         mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, 0]),
     ]
 
