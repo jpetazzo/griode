@@ -95,6 +95,7 @@ class Fluidsynth(object):
         self.fluidsynth.stdin.write(msg.encode("ascii"))
         self.fluidsynth.stdin.flush()
         self.fluidsynth.stdin.close()
+        logging.debug("...Invoked fluidsynth to enumerate instruments")
         output = self.fluidsynth.stdout.read().decode("ascii")
         instruments = re.findall("\n([0-9]{3,})-([0-9]{3}) (.*)", output)
         self.instruments = []

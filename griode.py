@@ -3,7 +3,7 @@ import logging
 import mido
 import os
 import time
-
+import getpass
 
 from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
@@ -20,8 +20,10 @@ import scales
 
 
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
+
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=log_level, format=log_format)
+logging.debug("User: {}".format(getpass.getuser()))
 
 
 @persistent_attrs(key=notes.C, scale=scales.MAJOR)
