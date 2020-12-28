@@ -4,6 +4,7 @@ import mido
 import os
 import time
 import getpass
+import signal
 
 from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
@@ -25,8 +26,18 @@ log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=log_level, format=log_format)
 logging.debug("User: {}".format(getpass.getuser()))
 
+scale = [0, 3, 6, 7, 10]
 
-@persistent_attrs(key=notes.C, scale=scales.MAJOR)
+def handler(signum, frame):
+    global scale
+    scale=scales.MAJOR
+    logging.debug("signum {} frame  {} scale {}".
+                  format(signum, frame, scale))
+
+signal.signal(signal.SIGUSR2, handler)
+    
+#@persistent_attrs(key=notes.C, scale=scales.MAJOR)
+@persistent_attrs(key=notes.C)
 class Griode(object):
 
     def __init__(self):
@@ -34,6 +45,7 @@ class Griode(object):
         self.synth = Fluidsynth()
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
         self.grids = []
+        #self.scale = scale
         self.cpu = CPU(self)
         self.clock = Clock(self)
         self.looper = Looper(self)
@@ -44,6 +56,10 @@ class Griode(object):
             from termpad import ASCIIGrid
             self.grids.append(ASCIIGrid(self, 0, 1))
 
+    def theScale(self):
+        logging.debug("scale: {}".format(scale))
+        return scale
+        
     def tick(self, tick):
         pass
 
@@ -177,6 +193,7 @@ def show_pattern(griode, pattern, color_on, color_off):
 
 
 def main():
+    logging.debug("")
     griode = Griode()
     try:
         while True:

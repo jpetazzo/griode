@@ -357,6 +357,7 @@ class LoopController(Gridget):
             grid.loopcontroller.draw()
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         if button == "UP":
             self.mode = "PLAY"
         if button == "DOWN":
@@ -493,6 +494,7 @@ class LoopEditor(CellPicker):
         self.draw()
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         if button == "UP":
             self.grid.focus(self.grid.loopcontroller)
         if button == "DOWN":
@@ -567,5 +569,6 @@ class StepSequencer(CellPicker):
                     Note(note=self.note, velocity=velocity, duration=self.ticks_per_cell))
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         if button == "UP":
             self.grid.focus(self.grid.loopcontroller.loopeditor)

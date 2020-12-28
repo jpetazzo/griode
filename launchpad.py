@@ -38,6 +38,7 @@ class LaunchPad(Grid):
             velocity = message.velocity
         elif message.type == "control_change":
             led = self.message2led.get(("CC", message.control))
+            logging.debug("Control message.  LED: {}".format(led))
 
         if led is None:
             logging.warning("Unhandled message: {}".format(message))

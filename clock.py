@@ -1,7 +1,7 @@
 import logging
 import resource
 import time
-
+import socket # For the controlling software
 
 from gridgets import Gridget, Surface
 from palette import palette
@@ -26,6 +26,14 @@ class Clock(object):
         self.tick = 0  # 24 ticks per quarter note
         self.next = time.time()
         self.cues = []
+
+        # Set up IPC so a external programme can control Griode
+        self.host = '127.0.0.1'
+        self.port = 8888
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.setblocking(False)
+        self.socket.bind((self.host, self.port))
+        self.socket.listen()
 
     def cue(self, when, func, args):
         self.cues.append((self.tick+when, func, args))
@@ -69,7 +77,9 @@ class Clock(object):
 
     # Wait until next tick is due.
     def once(self):
-        time.sleep(self.poll())
+        sleepTime = self.poll()
+        logging.debug("Sleep: {}".format(sleepTime)) 
+        time.sleep(sleepTime)
 
 ##############################################################################
 
