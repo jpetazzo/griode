@@ -1,7 +1,11 @@
 import logging
 import resource
 import time
-import socket # For the controlling software
+
+# For reading commands
+import select 
+import os
+import errno
 
 from gridgets import Gridget, Surface
 from palette import palette
@@ -26,15 +30,17 @@ class Clock(object):
         self.tick = 0  # 24 ticks per quarter note
         self.next = time.time()
         self.cues = []
-
-        # Set up IPC so a external programme can control Griode
-        self.host = '127.0.0.1'
-        self.port = 8888
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setblocking(False)
-        self.socket.bind((self.host, self.port))
-        self.socket.listen()
-
+        logging.debug("Opening command pipe");
+        self.commands = open(".commands", 'r')
+        self.commandPoll = select.poll()
+        self.polledFiles = dict()
+        self.commandPoll.register(self.commands, select.POLLIN)
+        self.polledFiles[self.commands.fileno()] = self.commands
+        
+        logging.debug("Poll registered for command pipe.  Flag: {}".format(select.POLLIN));        
+        logging.debug("pollin: {} pollpri {} pollout {}".
+                      format(select.POLLIN, select.POLLPRI, select.POLLOUT));
+        
     def cue(self, when, func, args):
         self.cues.append((self.tick+when, func, args))
 
@@ -53,7 +59,28 @@ class Clock(object):
         self.griode.looper.tick(self.tick)
         self.griode.cpu.tick(self.tick)
         self.griode.tick(self.tick)
+        # Check for commands from the Lord and Master
+        for fd, event in  self.commandPoll.poll():
+            logging.debug("Got some command: fd {} event {}".format(fd, event))
+            # Got something
+            if event == select.POLLIN:
+                # A command to read
+                N = os.fstat(fd).st_size
+                logging.debug("Got some command: POLLIN Bytes: {}".format(N))
+                try:
+                    command = os.read(fd, 1024)
+                except OSError as err:
+                    if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
+                        command = None
+                    else:
+                        raise
 
+                # fileObj = self.polledFiles[fd]
+                # command = fileObj.read()
+                logging.debug("command: {}".format(command))
+                
+                
+        
     # Return how long it is until the next tick.
     # (Or zero if the next tick is due now, or overdue.)
     def poll(self):
@@ -78,7 +105,7 @@ class Clock(object):
     # Wait until next tick is due.
     def once(self):
         sleepTime = self.poll()
-        logging.debug("Sleep: {}".format(sleepTime)) 
+        # logging.debug("Sleep: {}".format(sleepTime)) 
         time.sleep(sleepTime)
 
 ##############################################################################
