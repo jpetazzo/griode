@@ -19,7 +19,7 @@ class LaunchPad(Grid):
         logging.debug("grid_in {}".format(self.grid_in))
 
     def process_message(self, message):
-        logging.debug("{} got message {}".format(self, message))
+        # logging.debug("{} got message {}".format(self, message))
 
         # OK this is a hack to use fluidsynth directly with the Launchpad Pro
         if getattr(message, "channel", None) == 8:

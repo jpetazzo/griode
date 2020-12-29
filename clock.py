@@ -61,26 +61,40 @@ class Clock(object):
         self.griode.tick(self.tick)
         # Check for commands from the Lord and Master
         for fd, event in  self.commandPoll.poll():
-            logging.debug("Got some command: fd {} event {}".format(fd, event))
             # Got something
             if event == select.POLLIN:
                 # A command to read
                 N = os.fstat(fd).st_size
-                logging.debug("Got some command: POLLIN Bytes: {}".format(N))
                 try:
-                    command = os.read(fd, 1024)
+                    commandment = os.read(fd, 1024)
                 except OSError as err:
                     if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
-                        command = None
+                        commandment = None
                     else:
                         raise
 
-                # fileObj = self.polledFiles[fd]
-                # command = fileObj.read()
-                logging.debug("command: {}".format(command))
-                
-                
-        
+                logging.debug("commandment: {}".format(commandment))
+
+                # Break the commandment into two sections: Command and
+                # data.  The command is the commandment from its start
+                # to teh first space, the data is everything else
+                command, data = self.decodeCommandment(commandment)
+                logging.debug("command: {} data {}".format(command, data))
+                if command == b"scale":
+                    scale = eval(data)
+                    self.griode.setScale(scale)
+                else:
+                    logging.debug("Did not understand commandment: {}".
+                                 format(commandment))
+
+    def decodeCommandment(self, commandment):
+        # Split into words.  Command is first word, data is everything
+        # else
+        commandments = commandment.split()
+        command = commandments.pop(0)
+        data = b" ".join(commandments)
+        return command, data
+    
     # Return how long it is until the next tick.
     # (Or zero if the next tick is due now, or overdue.)
     def poll(self):
