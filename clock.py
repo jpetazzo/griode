@@ -83,6 +83,10 @@ class Clock(object):
                 if command == b"scale":
                     scale = eval(data)
                     self.griode.setScale(scale)
+                    for g in self.griode.grids:
+                        logging.debug("g: {}".format(g))
+                        g.focus(g.notepickers[g.channel])
+                        g.notepickers[g.channel].draw()
                 else:
                     logging.debug("Did not understand commandment: {}".
                                  format(commandment))
