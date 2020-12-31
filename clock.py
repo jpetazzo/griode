@@ -56,9 +56,10 @@ class Clock(object):
             grid.tick(self.tick)
         for grid in self.griode.grids:
             grid.loopcontroller.tick(self.tick)
-        self.griode.looper.tick(self.tick)
-        self.griode.cpu.tick(self.tick)
-        self.griode.tick(self.tick)
+            self.griode.looper.tick(self.tick)
+            self.griode.cpu.tick(self.tick)
+            self.griode.tick(self.tick)
+
         # Check for commands from the Lord and Master
         for fd, event in  self.commandPoll.poll():
             # Got something
@@ -81,8 +82,19 @@ class Clock(object):
                 command, data = self.decodeCommandment(commandment)
                 logging.debug("command: {} data {}".format(command, data))
                 if command == b"scale":
-                    scale = eval(data)
-                    self.griode.setScale(scale)
+                    logging.debug("Setting scale.  Was: {}".
+                                  format(self.griode.theScale()))
+                    #set the scale
+                    try:
+                        scale = eval(data)
+                        self.griode.setScale(scale)
+                        logging.debug("Set scale.  Is: {}".
+                                      format(self.griode.theScale()))
+                    except:
+                        logging.info("data: '{}' invalid".format(data))
+                    
+                elif command == b"draw":
+                    # Redraw the screen
                     for g in self.griode.grids:
                         logging.debug("g: {}".format(g))
                         g.focus(g.notepickers[g.channel])
@@ -105,13 +117,15 @@ class Clock(object):
         now = time.time()
         if now < self.next:
             return self.next - now
+
         self.tick += 1
         self.callback()
+
         # Compute when we're due next
         self.next += 60.0 / self.bpm / 24
         if now > self.next:
             logging.warning("We're running late by {} seconds!"
-                            .format(self.next-now))
+                            .format(now - self.next))
             # If we are late, should we try to stay aligned, or skip?
             margin = 0.0  # Put 1.0 for pseudo-realtime
             if now > self.next + margin:
