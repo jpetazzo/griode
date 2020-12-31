@@ -4,7 +4,7 @@ from gridgets import Surface
 from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
 
-
+# What is Latch for?  Is it saving up notes for dispatch?
 @persistent_attrs(enabled=False)
 class Latch(object):
 
