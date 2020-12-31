@@ -43,7 +43,11 @@ class Griode(object):
     def __init__(self):
         persistent_attrs_init(self)
         self.synth = Fluidsynth()
+
+        # 16 channels.  One DeviceChain for each channel.  Each
+        # DeviceChain has a `Latch` and `Arpeggiator`
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
+
         self.grids = []
         self.scale = [0, 3, 6, 7, 10]
         self.cpu = CPU(self)
@@ -151,6 +155,7 @@ class Grid(object):
 
 ##############################################################################
 
+# What is a DeviceChain for?
 @persistent_attrs(font_index=0, group_index=0, instr_index=0, bank_index=0)
 class DeviceChain(object):
 
