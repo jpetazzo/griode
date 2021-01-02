@@ -287,6 +287,7 @@ class InstrumentPicker(Gridget):
             self.devicechain.instr_index = col-1
         if row==4:
             self.devicechain.bank_index = col -1
+
         # Switch to new instrument
         self.devicechain.program_change()
         # Repaint
@@ -321,6 +322,7 @@ class InstrumentPicker(Gridget):
                 self.devicechain.group_index = instrument.program//8
                 self.devicechain.instr_index = instrument.program%8
                 self.devicechain.bank_index = instrument.bank_index
+
             self.devicechain.program_change()
             self.draw()
 

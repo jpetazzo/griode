@@ -180,11 +180,14 @@ class DeviceChain(object):
         return instrument
 
     def program_change(self):
-        instrument = self.instrument
+        self.program_change_instrument(self.instrument)
+        
+    def program_change_instrument(self, instrument):
         logging.info("Channel {} switching to instrument B{} P{}: {}"
                      .format(self.channel, instrument.bank,
                              instrument.program, instrument.name))
         for message in instrument.messages():
+            logging.debug("Instrument message: {}".format(message))
             self.send(message.copy(channel=self.channel))
 
     def send(self, message):

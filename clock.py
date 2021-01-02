@@ -10,7 +10,7 @@ import errno
 from gridgets import Gridget, Surface
 from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
-
+from fluidsynth import Instrument
 
 NUMBERS = """
 ###  #  ### ### # # ### ### ### ### ###
@@ -99,6 +99,16 @@ class Clock(object):
                         logging.debug("g: {}".format(g))
                         g.focus(g.notepickers[g.channel])
                         g.notepickers[g.channel].draw()
+
+                elif command == b"instrument":
+                    # Adding a instrument
+                    args = data.split()
+                    instrument = Instrument(int(args[0]),
+                                            int(args[1]), int(args[2]),
+                                            str(args[3]))
+                    for device in self.griode.devicechains:
+                        device.program_change_instrument(instrument)
+                    
                 else:
                     logging.debug("Did not understand commandment: {}".
                                  format(commandment))
