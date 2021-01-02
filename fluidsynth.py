@@ -18,6 +18,7 @@ import time
 class Instrument(object):
 
     def __init__(self, font, program, bank, name):
+            
         self.font = font        # fluidsynth font number (starts at 1)
         self.program = program  # MIDI program number [0..127]
         self.bank = bank        # MIDI bank [includes offset, so [0..9128]
@@ -105,7 +106,6 @@ class Fluidsynth(object):
             font_id = bank // 1000
             instrument = Instrument(font_id, prog, bank, name)
             self.instruments.append(instrument)
-        logging.info("Found {} instruments".format(len(self.instruments)))
 
         self.fonts = build_fonts(self.instruments)
 
@@ -158,9 +158,13 @@ def classify(list_of_things, get_key):
         dict_of_things[key].append(thing)
     return dict_of_things
 
-
 def get_dk_and_font(i):
-    if i.bank%1000 < 100:
+
+    # Generates a key for fonts dictionary.  Key is of form:
+    # (Boolean, Int) The Boolean if True indicates drums
+    
+    # For 1.sf2 -> Dethmetal.sf2 bank is 1126 but is not drums
+    if i.bank%1000 < 100 or i.bank == 1126:
         return (False, i.font)
     else:
         return (True, i.font)
@@ -175,7 +179,12 @@ def get_bank(i):
     return i.bank
 
 def build_fonts(instruments):
+
+    # Build a dictionary with keys: (Boolean, Int) where the boolean
+    # indicates drums if True and the int is font (bank / 1000).
+    # Values are Instrument objects
     fonts = classify(instruments, get_dk_and_font)
+
     for dk_and_font, instruments in fonts.items():
         groups = classify(instruments, get_group)
         for group, instruments in groups.items():
@@ -195,7 +204,9 @@ def build_fonts(instruments):
 
     # We could use enumerate() here, but let's try to be readable a bit...
     for font_index in range(len(fonts)):
+
         (is_drumkit, fluidsynth_font), font = fonts[font_index]
+
         for group in font.values():
             for instr in group.values():
                 for instrument in instr.values():
