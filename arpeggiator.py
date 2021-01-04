@@ -150,7 +150,7 @@ class Arpeggiator(object):
                 key = max(self.notes)
             if self.scale_key == ScaleKey.NEXT:
                 key = self.notes[self.next_note]
-            scale = [key+note for note in self.devicechain.griode.scale]
+            scale = [key+note for note in self.devicechain.griode.theScale()]
 
         logging.debug("computed scale: {}".format(scale))
         # OK, now we have a scale. Let's map the motif to the scale.
@@ -384,6 +384,7 @@ class ArpConfig(Gridget):
         self.draw()
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         try:
             if button == "UP":
                 self.page = Page(self.page.value-1)

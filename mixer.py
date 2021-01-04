@@ -88,6 +88,7 @@ class Faders(Gridget):
         self.draw()
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         if button == "LEFT":
             self.first_channel = 0
         if button == "RIGHT":

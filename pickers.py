@@ -62,7 +62,7 @@ class NotePicker(Gridget):
 
     @property
     def scale(self):
-        return self.grid.griode.scale
+        return self.grid.griode.theScale()
 
     def mode(self, is_drumkit):
         if is_drumkit:
@@ -73,6 +73,7 @@ class NotePicker(Gridget):
 
     def cycle(self):
         m = self.mapping
+        logging.debug("Here mapping: {}".format(m))
         try:
             self.mapping = m.__class__(m.value+1)
         except ValueError:
@@ -115,6 +116,8 @@ class NotePicker(Gridget):
         self.note2leds.clear()
         for led, note in self.led2note.items():
             if note not in self.note2leds:
+                # Why? What is this array?  All the `led`s for the
+                # `note`
                 self.note2leds[note] = []
             self.note2leds[note].append(led)
         self.draw()
@@ -149,6 +152,7 @@ class NotePicker(Gridget):
                 self.surface[led] = color
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         # FIXME allow to change layout for DRUMKIT? Or?
         if button == "UP":
             self.root += 12
@@ -283,6 +287,7 @@ class InstrumentPicker(Gridget):
             self.devicechain.instr_index = col-1
         if row==4:
             self.devicechain.bank_index = col -1
+
         # Switch to new instrument
         self.devicechain.program_change()
         # Repaint
@@ -293,6 +298,7 @@ class InstrumentPicker(Gridget):
             self.grid.notepickers[self.channel].mode(new_is_drumkit)
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         if button == "LEFT" and self.channel>0:
             self.grid.channel = self.channel-1
             self.grid.focus(self.grid.instrumentpickers[self.channel-1])
@@ -316,6 +322,7 @@ class InstrumentPicker(Gridget):
                 self.devicechain.group_index = instrument.program//8
                 self.devicechain.instr_index = instrument.program%8
                 self.devicechain.bank_index = instrument.bank_index
+
             self.devicechain.program_change()
             self.draw()
 
@@ -373,7 +380,7 @@ class ScalePicker(Gridget):
         row, column = note2piano[key]
         leds[row+6, column] = palette.ACTIVE
 
-        current_scale = self.grid.griode.scale
+        current_scale = self.grid.griode.theScale()
         for note in current_scale:
             row, column = note2piano[note]
             leds[row+3, column] = palette.ACTIVE
@@ -412,8 +419,8 @@ class ScalePicker(Gridget):
             if note is not None:
                 self.cue([note+self.grid.griode.key])
                 if note != 0:  # Do not remove the first note of the scale!
-                    if note in self.grid.griode.scale:
-                        self.grid.griode.scale.remove(note)
+                    if note in self.grid.griode.theScale():
+                        self.grid.griode.theScale().remove(note)
                     else:
                         self.grid.griode.scale.append(note)
                         self.grid.griode.scale.sort()
@@ -421,7 +428,7 @@ class ScalePicker(Gridget):
         # Play the current scale
         if (row, column) == (4, 8):
             scale = [self.grid.griode.key + n
-                     for n in self.grid.griode.scale + [12]]
+                     for n in self.grid.griode.theScale() + [12]]
             self.cue(scale)
 
         # Pick a scale from the palette

@@ -13,6 +13,8 @@ MENU = "BUTTON_1 BUTTON_2 BUTTON_3 BUTTON_4".split()
 
 class Surface(object):
 
+    # What is a surface?
+    
     def __init__(self, parent):
         # Initialize our "framebuffer"
         self.leds = {}
@@ -93,6 +95,7 @@ class Menu(Gridget):
         self.draw()
 
     def draw(self):
+        logging.debug("Here")
         for button in self.menu:
             if button == self.current:
                 self.surface[button] = palette.MENU[1]
@@ -100,7 +103,9 @@ class Menu(Gridget):
                 self.surface[button] = palette.MENU[0]
 
     def button_pressed(self, button):
+        logging.debug("button: {}".format(button))
         entries = self.menu[button]
+        logging.debug("entries: {}".format(entries))
         if button == self.current:
             # Cycle through the entries of one menu
             entries.append(entries.pop(0))
@@ -116,7 +121,9 @@ class Menu(Gridget):
         else:
             gridget = entry
         # Special case for the notepicker
+        logging.debug("self: {}".format(self))
         if len(entries) == 1 and cycle:
+            logging.debug("Special case for the notepicker")
             gridget.cycle()
         else:
             self.grid.focus(gridget)

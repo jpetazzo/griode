@@ -3,7 +3,8 @@ import logging
 import mido
 import os
 import time
-
+import getpass
+import signal
 
 from arpeggiator import ArpConfig, Arpeggiator
 from clock import BPMSetter, Clock, CPU
@@ -20,18 +21,35 @@ import scales
 
 
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
+
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
 logging.basicConfig(level=log_level, format=log_format)
+logging.debug("User: {}".format(getpass.getuser()))
 
 
-@persistent_attrs(key=notes.C, scale=scales.MAJOR)
+
+def handler(signum, frame):
+    global scale
+    scale=scales.MAJOR
+    logging.debug("signum {} frame  {} scale {}".
+                  format(signum, frame, scale))
+
+signal.signal(signal.SIGUSR2, handler)
+    
+#@persistent_attrs(key=notes.C, scale=scales.MAJOR)
+@persistent_attrs(key=notes.C)
 class Griode(object):
 
     def __init__(self):
         persistent_attrs_init(self)
         self.synth = Fluidsynth()
+
+        # 16 channels.  One DeviceChain for each channel.  Each
+        # DeviceChain has a `Latch` and `Arpeggiator`
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
+
         self.grids = []
+        self.scale = [0, 3, 6, 7, 10]
         self.cpu = CPU(self)
         self.clock = Clock(self)
         self.looper = Looper(self)
@@ -42,11 +60,19 @@ class Griode(object):
             from termpad import ASCIIGrid
             self.grids.append(ASCIIGrid(self, 0, 1))
 
+    def theScale(self):
+        # logging.debug("scale: {}".format(scale))
+        return self.scale
+        
+    def setScale(self, scale):
+        # logging.debug("scale: {}".format(scale))
+        self.scale = scale
+        
     def tick(self, tick):
         pass
 
     def detect_devices(self, initial=True):
-        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
+        from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS, LaunchpadX
         from keyboard import Keyboard
         logging.debug("Enumerating MIDI ports...")
         configured_ports = { grid.grid_name for grid in self.grids }
@@ -64,6 +90,9 @@ class Griode(object):
                 klass = LaunchpadMK2
             if "Launchpad S" in port_name:
                 klass = LaunchpadS
+            if "Launchpad X" in port_name:
+                logging.debug("Got X")
+                klass = LaunchpadX
             if "Launchpad Mini" in port_name:
                 klass = LaunchpadS
             if "reface" in port_name:
@@ -74,6 +103,8 @@ class Griode(object):
                     logging.info("Detected hotplug of new device: {}".format(port_name))
                     time.sleep(4)
                 self.grids.append(klass(self, port_name))
+
+        logging.debug("klass: {}".format(klass))
         for port_name in configured_ports - detected_ports:
             # Removing a device
             logging.info("Device {} is no longer plugged. Removing it."
@@ -124,6 +155,7 @@ class Grid(object):
 
 ##############################################################################
 
+# What is a DeviceChain for?
 @persistent_attrs(font_index=0, group_index=0, instr_index=0, bank_index=0)
 class DeviceChain(object):
 
@@ -148,11 +180,14 @@ class DeviceChain(object):
         return instrument
 
     def program_change(self):
-        instrument = self.instrument
+        self.program_change_instrument(self.instrument)
+        
+    def program_change_instrument(self, instrument):
         logging.info("Channel {} switching to instrument B{} P{}: {}"
                      .format(self.channel, instrument.bank,
                              instrument.program, instrument.name))
         for message in instrument.messages():
+            logging.debug("Instrument message: {}".format(message))
             self.send(message.copy(channel=self.channel))
 
     def send(self, message):
@@ -173,6 +208,7 @@ def show_pattern(griode, pattern, color_on, color_off):
 
 
 def main():
+    logging.debug("")
     griode = Griode()
     try:
         while True:

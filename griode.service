@@ -9,9 +9,9 @@ Description=Griode
 WantedBy=multi-user.target
 
 [Service]
-WorkingDirectory=/home/pi/griode
-ExecStart=/home/pi/griode/griode.py
-User=pi
-Group=audio
+WorkingDirectory=/home/patch/griode
+ExecStart=/home/patch/griode/griode.sh
+User=patch
+Group=jack
 Restart=always
 

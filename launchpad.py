@@ -16,9 +16,10 @@ class LaunchPad(Grid):
         self.surface = LPSurface(self)
         Grid.__init__(self, griode, port_name)
         self.grid_in.callback = self.process_message
+        logging.debug("grid_in {}".format(self.grid_in))
 
     def process_message(self, message):
-        logging.debug("{} got message {}".format(self, message))
+        # logging.debug("{} got message {}".format(self, message))
 
         # OK this is a hack to use fluidsynth directly with the Launchpad Pro
         if getattr(message, "channel", None) == 8:
@@ -37,6 +38,7 @@ class LaunchPad(Grid):
             velocity = message.velocity
         elif message.type == "control_change":
             led = self.message2led.get(("CC", message.control))
+            logging.debug("Control message.  LED: {}".format(led))
 
         if led is None:
             logging.warning("Unhandled message: {}".format(message))
@@ -87,6 +89,7 @@ class LPSurface(object):
 
 
 class LaunchpadPro(LaunchPad):
+    logging.debug("...")
 
     palette = "RGB"
     message2led = {}
@@ -105,6 +108,31 @@ class LaunchpadPro(LaunchPad):
         # This SysEx message switches the LaunchPad Pro to "programmer" mode
         mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]),
         # And this one sets the front/side LED
+        mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, 0]),
+    ]
+
+class LaunchpadX(LaunchPad):
+    logging.debug("...")
+
+    palette = "RGB"
+    message2led = {}
+    led2message = {}
+    for row in range(1, 9):
+        for column in range(1, 9):
+            note = 10*row + column
+            message2led["NOTE", note] = row, column
+            led2message[row, column] = "NOTE", note
+    for i, button in enumerate(ARROWS + MENU):
+        control = 91 + i
+        message2led["CC", control] = button
+        led2message[button] = "CC", control
+
+    setup = [
+        # This SysEx message switches the LaunchPad Pro to "programmer" mode
+        mido.Message("sysex", data=[0, 32, 41, 2, 12, 14, 1]),
+        #mido.Message("sysex", data=[0, 32, 41, 2, 16, 44, 3]),
+
+        # # And this one sets the front/side LED
         mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, 0]),
     ]
 

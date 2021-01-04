@@ -2,11 +2,15 @@ import logging
 import resource
 import time
 
+# For reading commands
+import select 
+import os
+import errno
 
 from gridgets import Gridget, Surface
 from palette import palette
 from persistence import persistent_attrs, persistent_attrs_init
-
+from fluidsynth import Instrument
 
 NUMBERS = """
 ###  #  ### ### # # ### ### ### ### ###
@@ -26,7 +30,17 @@ class Clock(object):
         self.tick = 0  # 24 ticks per quarter note
         self.next = time.time()
         self.cues = []
-
+        logging.debug("Opening command pipe");
+        self.commands = open(".commands", 'r')
+        self.commandPoll = select.poll()
+        self.polledFiles = dict()
+        self.commandPoll.register(self.commands, select.POLLIN)
+        self.polledFiles[self.commands.fileno()] = self.commands
+        
+        logging.debug("Poll registered for command pipe.  Flag: {}".format(select.POLLIN));        
+        logging.debug("pollin: {} pollpri {} pollout {}".
+                      format(select.POLLIN, select.POLLPRI, select.POLLOUT));
+        
     def cue(self, when, func, args):
         self.cues.append((self.tick+when, func, args))
 
@@ -42,23 +56,86 @@ class Clock(object):
             grid.tick(self.tick)
         for grid in self.griode.grids:
             grid.loopcontroller.tick(self.tick)
-        self.griode.looper.tick(self.tick)
-        self.griode.cpu.tick(self.tick)
-        self.griode.tick(self.tick)
+            self.griode.looper.tick(self.tick)
+            self.griode.cpu.tick(self.tick)
+            self.griode.tick(self.tick)
 
+        # Check for commands from the Lord and Master
+        for fd, event in  self.commandPoll.poll():
+            # Got something
+            if event == select.POLLIN:
+                # A command to read
+                N = os.fstat(fd).st_size
+                try:
+                    commandment = os.read(fd, 1024)
+                except OSError as err:
+                    if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
+                        commandment = None
+                    else:
+                        raise
+
+                logging.debug("commandment: {}".format(commandment))
+
+                # Break the commandment into two sections: Command and
+                # data.  The command is the commandment from its start
+                # to teh first space, the data is everything else
+                command, data = self.decodeCommandment(commandment)
+                logging.debug("command: {} data {}".format(command, data))
+                if command == b"scale":
+                    logging.debug("Setting scale.  Was: {}".
+                                  format(self.griode.theScale()))
+                    #set the scale
+                    try:
+                        scale = eval(data)
+                        self.griode.setScale(scale)
+                        logging.debug("Set scale.  Is: {}".
+                                      format(self.griode.theScale()))
+                    except:
+                        logging.info("data: '{}' invalid".format(data))
+                    
+                elif command == b"draw":
+                    # Redraw the screen
+                    for g in self.griode.grids:
+                        logging.debug("g: {}".format(g))
+                        g.focus(g.notepickers[g.channel])
+                        g.notepickers[g.channel].draw()
+
+                elif command == b"instrument":
+                    # Adding a instrument
+                    args = data.split()
+                    instrument = Instrument(int(args[0]),
+                                            int(args[1]), int(args[2]),
+                                            str(args[3]))
+                    for device in self.griode.devicechains:
+                        device.program_change_instrument(instrument)
+                    
+                else:
+                    logging.debug("Did not understand commandment: {}".
+                                 format(commandment))
+
+    def decodeCommandment(self, commandment):
+        # Split into words.  Command is first word, data is everything
+        # else
+        commandments = commandment.split()
+        command = commandments.pop(0)
+        data = b" ".join(commandments)
+        return command, data
+    
     # Return how long it is until the next tick.
     # (Or zero if the next tick is due now, or overdue.)
     def poll(self):
         now = time.time()
         if now < self.next:
             return self.next - now
+
         self.tick += 1
         self.callback()
+
         # Compute when we're due next
         self.next += 60.0 / self.bpm / 24
         if now > self.next:
             logging.warning("We're running late by {} seconds!"
-                            .format(self.next-now))
+                            .format(now - self.next))
             # If we are late, should we try to stay aligned, or skip?
             margin = 0.0  # Put 1.0 for pseudo-realtime
             if now > self.next + margin:
@@ -69,7 +146,9 @@ class Clock(object):
 
     # Wait until next tick is due.
     def once(self):
-        time.sleep(self.poll())
+        sleepTime = self.poll()
+        # logging.debug("Sleep: {}".format(sleepTime)) 
+        time.sleep(sleepTime)
 
 ##############################################################################
 
@@ -88,7 +167,7 @@ class CPU(object):
         new_time = time.time()
         if new_time > self.last_shown + 1.0:
             percent = (new_usage-self.last_usage)/(new_time-self.last_time)
-            logging.debug("CPU usage: {:.2%}".format(percent))
+            # logging.debug("CPU usage: {:.2%}".format(percent))
             self.last_shown = new_time
         self.last_usage = new_usage
         self.last_time = new_time
