@@ -51,6 +51,8 @@ my $jack_right_command = "jack_connect $fs_j_right system:playback_2";
 print `$jack_left_command 2>&1 `;
 print `$jack_right_command 2>&1 `;
 
+open(my $p, ">$cmdPipe") or die $!;
+
 wait;
 
 # Clean up
