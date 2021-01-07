@@ -18,6 +18,11 @@ from palette import palette
 from persistence import cache, persistent_attrs, persistent_attrs_init
 from pickers import ColorPicker, InstrumentPicker, NotePicker, ScalePicker
 import scales
+pid = os.getpid()
+with open(".griode.pid", "w") as f:
+    f.write("{}".format(pid))
+    
+    
 
 
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
@@ -214,6 +219,7 @@ def main():
         while True:
             griode.clock.once()
     except KeyboardInterrupt:
+        logging.debug("Keyboard Interupt")
         show_pattern(griode, PATTERN_SAVING, palette.ACTIVE, palette.BLACK)
         for db in cache.values():
             db.close()
