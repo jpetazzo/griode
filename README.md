@@ -2,18 +2,8 @@
 
 Griode lets you play music using a LaunchPad or a similar controller.
 
-For short demos and tutorials, check this [YouTube playlist](https://www.youtube.com/playlist?list=PLBAFXs0YjviK9PzKnr3MDsRU6YAJgeH1K).
 
-I gave a few talks about Griode:
-- Berlin Hack&Tell at C-Base (May 2018) [🔗](https://berlinhackandtell.rocks/2018-05-29-no61-revolutionary-may-hacks)
-- Linux Technologies Berlin (July 2018) [🔗](https://www.meetup.com/linux-technologies-berlin/events/252302070/)
-- Python Users Berlin (April 2019) [🔗](https://www.meetup.com/Python-Users-Berlin-PUB/events/258989401/)
-
-[Here are the slides](https://docs.google.com/presentation/d/1G0bdcSyqqoCiD4dK7tq6PZsoMaM_VVexx_n8m4kSYYE/edit#slide=id.p) that I use when presenting Griode.
-
-There is a basic (and incomplete) [user manual](MANUAL.md) that
-you may (or not) find helpful. The videos might be more useful for
-the time being ...
+There is a basic (and incomplete) [user manual](MANUAL.md)
 
 
 ## Quick start
@@ -22,28 +12,16 @@ Here are some quick instructions to get you started, assuming that you
 have a LaunchPad connected to an Debian/Ubuntu system.
 
 ```
-git clone git://github.com/jpetazzo/griode
+git clone git://github.com/worikgh/griode
 cd griode
 sudo apt-get install python3-pip python3-dev libasound2-dev libjack-dev fluidsynth
 pip3 install --user -r requirements.txt
 ( cd soundfonts; ./download-soundfonts.sh; )
-./griode.py
+./griode.sh
 ```
 
 Your LaunchPad should light up with a red and white pattern, and pressing
 pads should make piano sounds.
-
-
-### Installing on a Raspberry Pi
-
-If you want to setup Griode on a Raspberry Pi, you can use the
-instructions above, but **make sure that you run them as the `pi` user.**
-
-You can use the "lite" (text only) or the "desktop" version, it
-doesn't matter for Griode.
-
-If you want Griode to start automatically when the Pi is powered on,
-see [this paragraph](#Starting-automatically-on-boot).
 
 
 ## Detailed setup instructions
@@ -51,10 +29,14 @@ see [this paragraph](#Starting-automatically-on-boot).
 You need:
 
 - Python 3
+- Jackd audio
 - FluidSynth (to generate sounds)
 - at least one SoundFont (instrument bank used by FluidSynth)
 - a LaunchPad or similar MIDI controller
+- ladspa-sdk
+- ecasound
 
+caps: http://quitte.de/dsp/caps.html#Install
 
 ### Installing Python dependencies
 
@@ -71,10 +53,8 @@ You can then install Griode's requirements with `pip`:
 pip install --user -r requirements.txt
 ```
 
-Of course, you are welcome to use `virtualenv` or anything like that
-if you want.
-
-If you get compilation errors, you might need extra packages (libraries or headers).
+If you get compilation errors, you might need extra packages
+(libraries or headers).
 
 Note: if you have problems related to the installation of `python-rtmidi`,
 you might be tempted to try to install `rtmidi` instead. DO NOT! The two
@@ -90,7 +70,6 @@ can install it with:
 ```
 apt-get install fluidsynth
 ```
-
 
 ### Installing SoundFonts
 
@@ -129,12 +108,11 @@ Here are a few links to some SF2 files:
 - [8bitsf](https://musical-artifacts.com/artifacts/23/8bitsf.SF2)
 - [BASSMIDI](https://kode54.net/bassmididrv/BASSMIDI_Driver_Installation_and_Configuration.htm)
 
-
 ### LaunchPad
 
-Griode currently supports the Launchpad Pro, the Launchpad MK2 (aka "RGB"),
-and has partial support for the Launchpad S. You can plug multiple
-controllers and use them simultaneously.
+Griode currently supports the Launchpad Pro, Launchpad X, the
+Launchpad MK2 (aka "RGB"), and has partial support for the Launchpad
+S. You can plug multiple controllers and use them simultaneously.
 
 Griode relies on the name of the MIDI port reported by the `mido` library
 to detect your Launchpad(s). This has been tested on Linux, but the port
@@ -187,6 +165,26 @@ If it doesn't start, or if you want to see what's going on:
 sudo systemctl status griode
 sudo journalctl -u griode
 ```
+
+## Controlling `griode` at run time
+
+Write commands to nammed pipe: .command
+
+Commands are formatted:
+<Name> [<args>]
+
+Recognised names:
+
+* draw
+
+  Redraw the keypad
+
+* instrument F P B N
+
+  F:Int Font
+  P:Int Programme
+  B:Int Bank
+  N:Str Name
 
 
 ## Bugs
