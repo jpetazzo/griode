@@ -1,6 +1,8 @@
+.gitignore
 __pycache__
 *.swp
 *.sf2
 *.sav
 *.db
 *~
+*.sh
