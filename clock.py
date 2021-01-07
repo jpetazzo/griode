@@ -31,15 +31,13 @@ class Clock(object):
         self.next = time.time()
         self.cues = []
         logging.debug("Opening command pipe");
-        self.commands = open(".commands", 'r')
+        self.commands = open(".griode.commands", 'r')
         self.commandPoll = select.poll()
         self.polledFiles = dict()
         self.commandPoll.register(self.commands, select.POLLIN)
         self.polledFiles[self.commands.fileno()] = self.commands
         
         logging.debug("Poll registered for command pipe.  Flag: {}".format(select.POLLIN));        
-        logging.debug("pollin: {} pollpri {} pollout {}".
-                      format(select.POLLIN, select.POLLPRI, select.POLLOUT));
         
     def cue(self, when, func, args):
         self.cues.append((self.tick+when, func, args))
@@ -61,61 +59,76 @@ class Clock(object):
             self.griode.tick(self.tick)
 
         # Check for commands from the Lord and Master
-        for fd, event in  self.commandPoll.poll():
+        for fd, event in  self.commandPoll.poll(0):
+
             # Got something
             if event == select.POLLIN:
                 # A command to read
+                logging.debug("Got something")
+
                 N = os.fstat(fd).st_size
                 try:
-                    commandment = os.read(fd, 1024)
+                    commandments = os.read(fd, 1024)
                 except OSError as err:
                     if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
-                        commandment = None
+                        commandments = None
                     else:
                         raise
 
-                logging.debug("commandment: {}".format(commandment))
+                logging.debug("commandments: {}".format(commandments))
 
-                # Break the commandment into two sections: Command and
-                # data.  The command is the commandment from its start
-                # to teh first space, the data is everything else
-                command, data = self.decodeCommandment(commandment)
-                logging.debug("command: {} data {}".format(command, data))
-                if command == b"scale":
-                    logging.debug("Setting scale.  Was: {}".
-                                  format(self.griode.theScale()))
-                    #set the scale
-                    try:
-                        scale = eval(data)
-                        self.griode.setScale(scale)
-                        logging.debug("Set scale.  Is: {}".
+
+                # Commands are seperated by \n
+                commands = commandments.split(b"\n")
+                for commandment in commands:
+                    # Break the commandment into two sections: Command
+                    # and data.  The command is the commandment from
+                    # its start to the first space, the data is
+                    # everything else
+                    if commandment == b'':
+                        # Empty strings are ignored
+                        continue
+                        
+                    logging.debug("commandment: {}".format(commandment))                    
+                    command, data = self.decodeCommandment(commandment)
+                    logging.debug("command: {} data {}".format(command, data))
+                    if command == b"scale":
+                        logging.debug("Setting scale.  Was: {}".
                                       format(self.griode.theScale()))
-                    except:
-                        logging.info("data: '{}' invalid".format(data))
-                    
-                elif command == b"draw":
-                    # Redraw the screen
-                    for g in self.griode.grids:
-                        logging.debug("g: {}".format(g))
-                        g.focus(g.notepickers[g.channel])
-                        g.notepickers[g.channel].draw()
+                        #set the scale
+                        try:
+                            scale = eval(data)
+                            self.griode.setScale(scale)
+                            logging.debug("Set scale.  Is: {}".
+                                          format(self.griode.theScale()))
+                        except:
+                            logging.info("data: '{}' invalid".format(data))
+                        
+                    elif command == b"draw":
+                        # Redraw the screen
+                        for g in self.griode.grids:
+                            logging.debug("g: {}".format(g))
+                            g.focus(g.notepickers[g.channel])
+                            g.notepickers[g.channel].draw()
 
-                elif command == b"instrument":
-                    # Adding a instrument
-                    args = data.split()
-                    instrument = Instrument(int(args[0]),
-                                            int(args[1]), int(args[2]),
-                                            str(args[3]))
-                    for device in self.griode.devicechains:
-                        device.program_change_instrument(instrument)
-                    
-                else:
-                    logging.debug("Did not understand commandment: {}".
-                                 format(commandment))
-
+                    elif command == b"instrument":
+                        # Adding a instrument
+                        args = data.split()
+                        instrument = Instrument(int(args[0]),
+                                                int(args[1]), int(args[2]),
+                                                str(args[3]))
+                        for device in self.griode.devicechains:
+                            device.program_change_instrument(instrument)
+                        
+                    else:
+                        logging.debug("Did not understand commandment: {}".
+                                      format(commandment))
+        # logging.debug("End of clock callback")
+        
     def decodeCommandment(self, commandment):
         # Split into words.  Command is first word, data is everything
         # else
+        logging.debug("commandment: {}".format(commandment))
         commandments = commandment.split()
         command = commandments.pop(0)
         data = b" ".join(commandments)
