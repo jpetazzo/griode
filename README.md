@@ -34,9 +34,87 @@ You need:
 - at least one SoundFont (instrument bank used by FluidSynth)
 - a LaunchPad or similar MIDI controller
 - ladspa-sdk
-- ecasound
+- lilv-utils
+- mod-host
 
-caps: http://quitte.de/dsp/caps.html#Install
+- avw.lv2 drumkv1-lv2 guitarix-lv2 invada-studio-plugins-lv2 ir.lv2
+  lv2fil mda-lv2 modep-lv2-amsynth modep-lv2-calf modep-l v2-caps
+  modep-lv2-fluidplug modep-lv2-fomp modep-lv2-freaked
+  modep-lv2-guitarix modep-lv2-gx-slowgear modep-lv2-gx-switchless-wah
+  modep-lv2-infamousplugins modep-lv2-invada-studio modep-lv2-mda
+  modep-lv2-mod-distortion modep-lv2-rkrlv2 modep-lv2-setbfree
+  modep-lv2-shiroplugins modep-lv2-tap modep-lv2-tinyg
+
+## Using `mod-host`
+
+`mod-host -i` starts a interactive session.  Commands can be entered from the command line
+Otherwise send commands to socket: 5555 (`-p N` sets socket to `N`)
+
+`lv2ls` lists all `lv2` plugins on your system
+
+E.g:
+```
+http://avwlv2.sourceforge.net/plugins/avw/absolute
+http://avwlv2.sourceforge.net/plugins/avw/ad
+http://avwlv2.sourceforge.net/plugins/avw/cvs
+http://avwlv2.sourceforge.net/plugins/avw/cvtocontrol
+http://avwlv2.sourceforge.net/plugins/avw/delay
+```
+
+In `mod-host` use command: `add <URI> <N>` where `URI` is found using
+`lv2ls` and `N` is a number that will be used to identify the plugin
+
+To find what a plugin's properties are, use `lv2info <URI>`
+
+E.g:
+
+```
+$ lv2info http://avwlv2.sourceforge.net/plugins/avw/amp
+http://avwlv2.sourceforge.net/plugins/avw/amp
+
+	Name:              AMS Amp
+	Class:             Amplifier
+	Author:            Aurélien Leblond
+	Author Email:      mailto:blablack@gmail.com
+	Has latency:       no
+	Bundle:            file:///usr/lib/lv2/avw.lv2/
+	Binary:            file:///usr/lib/lv2/avw.lv2/amp.so
+	UIs:
+		http://avwlv2.sourceforge.net/plugins/avw/amp/gui
+			Class:  http://lv2plug.in/ns/extensions/ui#GtkUI
+			Binary: file:///usr/lib/lv2/avw.lv2/amp_gui.so
+			Bundle: file:///usr/lib/lv2/avw.lv2/
+	Data URIs:         file:///usr/lib/lv2/avw.lv2/manifest.ttl
+	                   file:///usr/lib/lv2/avw.lv2/amp.ttl
+	Optional Features: http://lv2plug.in/ns/lv2core#hardRTCapable
+	Presets: 
+
+	Port 0:
+		Type:        http://lv2plug.in/ns/lv2core#ControlPort
+		             http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      gain
+		Name:        Gain
+		Minimum:     -10.000000
+		Maximum:     10.000000
+		Default:     1.000000
+
+	Port 1:
+		Type:        http://lv2plug.in/ns/lv2core#CVPort
+		             http://lv2plug.in/ns/lv2core#InputPort
+		Symbol:      input
+		Name:        Input
+
+	Port 2:
+		Type:        http://lv2plug.in/ns/lv2core#CVPort
+		             http://lv2plug.in/ns/lv2core#OutputPort
+		Symbol:      output
+		Name:        Output
+```
+
+See https://github.com/moddevices/mod-host
+
+When a plugin is added with `add` a new `jack` input and output is created for it.
+
 
 ### Installing Python dependencies
 
