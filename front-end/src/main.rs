@@ -29,7 +29,8 @@ fn get_jack_ports() -> std::io::Result<Vec<u8>> {
     Ok(output.stdout)
 }
 fn list_songs()  -> std::io::Result<Vec<u8>> {
-    
+    let foo:Vec<u8> = [1,2,3].to_vec();
+    Ok(foo)
 }
 // 
 
