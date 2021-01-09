@@ -1,5 +1,5 @@
 [package]
-name = "hello-world"
+name = "front-end"
 version = "0.1.0"
 authors = ["Worik <5387413+worikgh@users.noreply.github.com>"]
 edition = "2018"
