@@ -6,3 +6,9 @@ __pycache__
 *.db
 *~
 *.sh
+#*
+.commands
+.griode.pid
+*.lock
+lv2.json
+

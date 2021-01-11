@@ -12,7 +12,6 @@ print $out "[\n";
 my @lv2_urls = map {chomp; $_} `lv2ls`;
 
 foreach my $url (@lv2_urls){
-    rand() > 0.9 or next;
     my @info = `lv2info $url`;
     my $name;
     my $class;
