@@ -31,7 +31,14 @@ foreach my $url (@lv2_urls){
 	    $name = $1;
 	    next;
 	}elsif($state eq "start" and $l =~ /^\s+Class:\s+(.+)\s*$/){
-	    $class = $1;
+	    my $c = $1;
+	    if($c =~ /plug.in/){
+		# Generic class with no information
+		if(defined $name){
+		    $c = $name;
+		}
+	    }
+	    $class = $c;
 	    next;
 	}elsif($l =~ /^\s+Port\s+(\d+):\s*$/){
 	    $port = $1;
