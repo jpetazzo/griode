@@ -264,6 +264,17 @@ Recognised names:
   B:Int Bank
   N:Str Name
 
+## `setup <file name>`
+
+Prepare a file of commands for `mod-host`, `jack`, or `griode` (as
+above) in `<file name>` and pass it to `setup` to control ths
+programmes.
+
+
+### `.state`
+
+`setup` keeps a record of the state changes  as managed by `state`
+
 
 ## Bugs
 
