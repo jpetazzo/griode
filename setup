@@ -1,0 +1,106 @@
+#!/usr/bin/perl -w
+use strict;
+use IPC::Open2;
+use Fcntl;
+use Symbol 'gensym'; # vivify a separate handle for STDERR
+use File::Spec;
+
+# Set up the parameters of a instrument.  Set up LV2 effects, JACK
+# connections, and GRIODE parameters
+
+# A file of commands is prepared and the file name passed to this
+# programme
+
+# The state file keeps track of what `status` has done to `mod-host`
+my $state_fn = '.state';
+-e $state_fn or `touch $state_fn`;
+-r $state_fn or die "$!: Cannot read $state_fn ";
+-w $state_fn or die "$!: Cannot read $state_fn ";
+
+# Data about LV2 effects is stored in the state file: (TODO: Expand to
+# hold JACK/GRIODE state as well)
+
+# The mod-host works having a set of "effects".  Each one is added
+# with the command:
+
+# add <URL> <N>
+
+# The <URL> identifies the effect (the command lv2ls lists all the
+# URLs of installed LV2 effects).
+
+# <N> is a unique number.  The Jack inputs/outputs are
+# `effect_N:input`/`effect_N:output`
+
+# When a valid `add` command in received a record is created by adding
+# a line: "<N> <URL>\n"
+
+# When a parameter is using command `param_set` a line is added `<N>
+# <param_name,value>...<param_name,value>`
+
+# On startup the parameters are read into a hash keyed by N, value is
+# a HASHREF.  One enty is `url => <URL>`.  Each parameter uses the
+# parameter name as a key and the value is a array of values. (are
+# they allways numbers?)
+
+# Read in state
+my %state = ();
+open(my $statefh, $state_fn) or die $!;
+while(my $line = <$statefh>){
+    chome $line;
+    $line =~ /^(\d+)\s+(.+)\s*$/ or die "$line ";
+    my $N = $1;
+    my $rest = $2;
+    defined($state{$N}) or $state{$N}= {};
+    if($rest =~ /^http/){
+	# A url
+	$state{$N}->{URL} = $rest;
+    }elsif($rest =~ /^(\S+)\s+(.+)\s*$/){
+	# Parameters
+	my $name = $1;
+	my %values = map{/^(\S+),(\d+)/ or die "$_: $line ";
+			 $1 => $2} split(/\s+/, $2;);
+	map { $state{$N}->{$_} = $values{$_}} keys %values;
+    }else{
+	die $line;
+    }
+}
+# Set up effects in mod-host
+my $port = 5555;
+
+# Start up a `nc 127.0.0.1 $port ` and send commands to it
+
+# Pass file name on command line that holds commands
+my $command_fn = shift or die "No file name passed";
+-r $command_fn or die "$!: Cannot read file: $command_fn";
+open(my $in, $command_fn) or die "$!: Cannot open $command_fn";
+my @commands = <$in>;
+close($in);
+
+#my $pid = open(my $nc, "|-", "/usr/bin/nc localhost $port") or die $!;
+foreach my $cmd (@commands){
+
+    # The command could be:
+    # * For mod-host (param-set/add)
+    # * jack (jack-con/jack-dis)
+    # * griode (anythink else)
+    my $pid = open2(my $child_out, my $child_in, "/usr/bin/nc localhost $port");
+    defined $pid or die "$!: Fork failed";
+    
+    print "Sending command: $cmd";
+    print $child_in $cmd;
+
+    my $res = '';
+    while(1){
+	read($child_out, $res, 1);
+	if($res eq "\n"){
+	    last;
+	}
+	if(ord($res) == 0){
+	    last;
+	}
+	print $res;
+    }
+    print "\n";
+    
+    kill 'HUP' , $pid;
+}
