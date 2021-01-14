@@ -43,27 +43,51 @@ my $state_fn = '.state';
 # they allways numbers?)
 
 # Read in state
-my %state = ();
-open(my $statefh, $state_fn) or die $!;
-while(my $line = <$statefh>){
-    chome $line;
-    $line =~ /^(\d+)\s+(.+)\s*$/ or die "$line ";
-    my $N = $1;
-    my $rest = $2;
-    defined($state{$N}) or $state{$N}= {};
-    if($rest =~ /^http/){
-	# A url
-	$state{$N}->{URL} = $rest;
-    }elsif($rest =~ /^(\S+)\s+(.+)\s*$/){
-	# Parameters
-	my $name = $1;
-	my %values = map{/^(\S+),(\d+)/ or die "$_: $line ";
-			 $1 => $2} split(/\s+/, $2;);
-	map { $state{$N}->{$_} = $values{$_}} keys %values;
-    }else{
-	die $line;
+sub read_state_file(){
+
+    my %state = ();
+    open(my $statefh, $state_fn) or die $!;
+    while(my $line = <$statefh>){
+	chomp $line;
+	$line =~ /^(\d+)\s+(.+)\s*$/ or die "$line ";
+	my $N = $1;
+	my $rest = $2;
+	defined($state{$N}) or $state{$N} = {};
+	if($rest =~ /^http/){
+	    # A url
+	    $state{$N}->{URL} = $rest;
+	}elsif($rest =~ /^(\S+)\s+(.+)\s*$/){
+	    # Parameters
+	    my $name = $1;
+	    my $values = $2;
+	    my %values = map{/^(\S+),(\d+)/ or die "$_: $line ";
+			     $1 => $2
+	    }
+	    split(/\s+/, $values);
+
+	    map { $state{$N}->{$_} = $values{$_}} keys %values;
+	}else{
+	    die $line;
+	}
+    }
+    return %state;
+}
+# Write out state
+sub write_state_file( $ ){
+    my $state_ref = shift or die;
+    my %state = %$state_ref;
+    open(my $statefh, ">$state_fn") or die $!;
+    foreach my $N (sort {$a <=> $b} keys %state){
+	my $url = $state{$N}->{URL} or die $N;
+	$url =~ /^http/ or die $url;
+	print $statefh "$N $url\n";
+	foreach my $param (sort grep {$_ !~ /URL/} keys %{$state{$N}}){
+	    print $statefh "$N $param $state{$N}->{$param}\n";
+	}
     }
 }
+my %state = &read_state_file;
+
 # Set up effects in mod-host
 my $port = 5555;
 
@@ -79,28 +103,78 @@ close($in);
 #my $pid = open(my $nc, "|-", "/usr/bin/nc localhost $port") or die $!;
 foreach my $cmd (@commands){
 
-    # The command could be:
-    # * For mod-host (param-set/add)
-    # * jack (jack-con/jack-dis)
-    # * griode (anythink else)
-    my $pid = open2(my $child_out, my $child_in, "/usr/bin/nc localhost $port");
-    defined $pid or die "$!: Fork failed";
-    
-    print "Sending command: $cmd";
-    print $child_in $cmd;
+    # Three sorts of command:
+    # 1 Effect add/parameter setting for mod-host
+    # A jack connection
+    # Commands to send to griode
 
-    my $res = '';
-    while(1){
-	read($child_out, $res, 1);
-	if($res eq "\n"){
-	    last;
-	}
-	if(ord($res) == 0){
-	    last;
-	}
-	print $res;
-    }
-    print "\n";
+    # The first (mod-host commands) start either with "add " or
+    # "param_set "
+
+    # The second starts with "echo "
+
+    # The third with "jack_connect"
+
+    # `mod-host` commands are sent via `nc`, the others via the shell
     
-    kill 'HUP' , $pid;
+    $cmd =~ /^(\S+)\s+(.+)\s*$/ or die "$cmd ";
+
+    my $cmd = $1;
+    my $rest = $2;
+
+    if($cmd eq "add" or $cmd eq "param_set"){
+	# `mod-host` command
+	my $N;
+	if($cmd eq "param_set"){
+	    # param_set 1 delay_base 30
+	    $rest =~ /^(\d+)\s/ or die $cmd;
+	    $N = $1;
+	}else{
+	    $rest =~ /(\d+)\s*$/ or die $cmd;
+	    $N = $1;
+	}
+	defined $N or die $cmd;
+	defined($state{$N}) or $state{$N}= {};
+	if($cmd eq "add"){
+	    # A url
+	    $rest =~ /^(http\S+)/ or die $cmd;
+	    $state{$N}->{URL} = $1;
+	}else{
+	    # Parameter
+	    $rest =~ /^$N\s(\S+)\s([\d\.]+)/ or die $cmd;
+	    my $name = $1;
+	    my $value = $2;
+	    $state{$N}->{$name} = $value;
+	}
+	
+
+	my $pid =
+	    open2(my $child_out, my $child_in, "/usr/bin/nc localhost $port");
+	defined $pid or die "$!: Fork failed";
+	
+	print "Sending command: $cmd";
+	print $child_in "$cmd $rest";
+
+	my $res = '';
+	while(1){
+	    read($child_out, $res, 1);
+	    if($res eq "\n"){
+		last;
+	    }
+	    if(ord($res) == 0){
+		last;
+	    }
+	    print $res;
+	    # FIXME  Process $res for errors
+	}
+	print "\n";
+	
+	kill 'HUP' , $pid;
+    }else{
+	# Just use the shell.  This would be a security hole a mile
+	# wide if anybody cared...
+	my $res = `$cmd`;
+	# FIXME Process $res for errors
+    }
 }
+&write_state_file( \%state );
