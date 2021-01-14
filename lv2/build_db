@@ -9,7 +9,7 @@ open(my $out, ">$db_filename") or die "$!: $db_filename";
 print $out "[\n";
 
 ## Load all LV2 plugins installed
-my @lv2_urls = map {chomp; $_} `lv2ls`;
+my @lv2_urls = map {chomp; $_} `LV2_PATH=/usr/local/lib/lv2/:/usr/lib/lv2/ lv2ls`;
 
 foreach my $url (@lv2_urls){
     my @info = `lv2info $url`;
