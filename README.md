@@ -115,7 +115,7 @@ See https://github.com/moddevices/mod-host
 
 When a plugin is added with `add` a new `jack` input and output is created for it.
 
-## `setup <file name`
+## `setup <file name>`
 
 The `setup` programme reads commands form the file passed to set up
 the instrument.  There are three classes of command: `griode`, `jack` and `mod-host:[param_set|add]`
@@ -130,7 +130,61 @@ The instrument to use.  This is a sound font.  Griode logs all available instrum
 
 ### `mod-host` Commands
 
-`param_set` and `add` as in [https://github.com/moddevices/mod-host/blob/master/README.md](mod-host documentation) (https://github.com/moddevices/mod-host/blob/master/README.md)[mod-host documentation]
+`param_set` and `add` as in [mod-host documentation](https://github.com/moddevices/mod-host/blob/master/README.md) 
+
+Example: 
+```
+add http://plugin.org.uk/swh-plugins/multivoiceChorus 1
+param_set 1 voices 7
+param_set 1 delay_base 1
+param_set 1 voice_spread 2
+param_set 1 detune 5
+```
+
+Adds in the effrect `multivoiceChorus` as `effect_1`
+
+### `jaqck` Commands
+
+To stich the audio together use `jack` commands with the components to link.
+
+The components built in are:
+
+* fluidsynth
+The synth that used the sound fonmts to generate the audoi.  It has two outputs for stereo
+.* fluidsynth:left
+
+.* fluidsynth:right
+
+* system
+
+There are two channels of input and two channels of output
+
+.* Input
+
+..* system:capture_1
+
+..* system:capture_2
+
+.* Output
+
+..* system:playback_1
+
+..* system:playback_2
+
+
+The `mod-host` effects have jack audio sockets as `effect_N:input` and `effect_N:output` (where `N` is the instrument number allocated with the `add` command.
+
+
+Example
+
+```
+jack fluidsynth:left effect_1:input
+jack fluidsynth:right effect_1:input
+jack effect_1:output system:playback_1
+jack effect_1:output system:playback_2
+```
+
+### 
 
 ### Installing Python dependencies
 
