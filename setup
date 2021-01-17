@@ -11,14 +11,19 @@ use File::Spec;
 # A file of commands is prepared and the file name passed to this
 # programme
 
-# The state file keeps track of what `status` has done to `mod-host`
-my $state_fn = '.state';
--e $state_fn or `touch $state_fn`;
--r $state_fn or die "$!: Cannot read $state_fn ";
--w $state_fn or die "$!: Cannot read $state_fn ";
+# Communication with other programmes.  `mod_host` handles LV2
+# effects.  `griode` runs the Launchpad X controller.
+my $mod_host_port = 5555;
+my $griode_port = 8887;
 
-# Data about LV2 effects is stored in the state file: (TODO: Expand to
-# hold JACK/GRIODE state as well)
+
+
+# The history file keeps track of what changes this has made to jack
+# and mod-host that have to be undone next run
+my $history_fn = '.history';
+-e $history_fn or `touch $history_fn`;
+-r $history_fn or die "$!: Cannot read $history_fn ";
+-w $history_fn or die "$!: Cannot read $history_fn ";
 
 # The mod-host works having a set of "effects".  Each one is added
 # with the command:
@@ -42,56 +47,44 @@ my $state_fn = '.state';
 # parameter name as a key and the value is a array of values. (are
 # they allways numbers?)
 
-# Read in state
-sub read_state_file(){
+#
+sub griode_command( $ ){
+    my $c = shift or die;
 
-    my %state = ();
-    open(my $statefh, $state_fn) or die $!;
-    while(my $line = <$statefh>){
-	chomp $line;
-	$line =~ /^(\d+)\s+(.+)\s*$/ or die "$line ";
-	my $N = $1;
-	my $rest = $2;
-	defined($state{$N}) or $state{$N} = {};
-	if($rest =~ /^http/){
-	    # A url
-	    $state{$N}->{URL} = $rest;
-	}elsif($rest =~ /^(\S+)\s+(.+)\s*$/){
-	    # Parameters
-	    my $name = $1;
-	    my $values = $2;
-	    my %values = map{/^(\S+),(\d+)/ or die "$_: $line ";
-			     $1 => $2
-	    }
-	    split(/\s+/, $values);
+}    
 
-	    map { $state{$N}->{$_} = $values{$_}} keys %values;
-	}else{
-	    die $line;
+# Read in history
+sub mod_host( $$ ){
+    my ($c, $rest) = @_;
+    # `mod-host` command
+
+    my $pid =
+	open2(my $child_out, my $child_in, "/usr/bin/nc localhost $mod_host_port");
+    defined $pid or die "$!: Fork failed";
+    #print "Sending command: $c";
+    print $child_in "$c $rest";
+
+    my $result = '';
+    while(1){
+	my $res = '';
+	read($child_out, $res, 1);
+	if($res eq "\n"){
+	    last;
 	}
-    }
-    return %state;
-}
-# Write out state
-sub write_state_file( $ ){
-    my $state_ref = shift or die;
-    my %state = %$state_ref;
-    open(my $statefh, ">$state_fn") or die $!;
-    foreach my $N (sort {$a <=> $b} keys %state){
-	my $url = $state{$N}->{URL} or die $N;
-	$url =~ /^http/ or die $url;
-	print $statefh "$N $url\n";
-	foreach my $param (sort grep {$_ !~ /URL/} keys %{$state{$N}}){
-	    print $statefh "$N $param $state{$N}->{$param}\n";
+	if(ord($res) == 0){
+	    last;
 	}
+	$result .=  $res;
+	# FIXME  Process $res for errors
     }
-}
-my %state = &read_state_file;
+    $result .= "\n";
+    kill 'HUP' , $pid;
+    return $result;
+}    
 
 # Set up effects in mod-host
-my $port = 5555;
 
-# Start up a `nc 127.0.0.1 $port ` and send commands to it
+# Start up a `nc 127.0.0.1 $mod_host_port ` and send commands to it
 
 # Pass file name on command line that holds commands
 my $command_fn = shift or die "No file name passed";
@@ -100,81 +93,45 @@ open(my $in, $command_fn) or die "$!: Cannot open $command_fn";
 my @commands = <$in>;
 close($in);
 
-#my $pid = open(my $nc, "|-", "/usr/bin/nc localhost $port") or die $!;
-foreach my $cmd (@commands){
+# Read history and undo commands run earlier and undo them
+my @history = `cat $history_fn`;
+foreach my $cmd (@history) {
+    # jack and mod-host commands are the only ones we need to undo
+    if($cmd =~ /^jack\s(\S+ \S+)\s*$/){
+	print `jack_disconnect $1`;
+    }elsif($cmd =~ /add\s\S+\s+(\d+)\s*$/){
+	print mod_host("remove", $1);
+    }	    
+}
 
+foreach my $cmd (@commands){
+    
+    ## Comments and blank lines
+    $cmd =~ /^\s*\#/ and next;
+    $cmd =~ /\S/ or next;
+    
     # Three sorts of command:
     # 1 Effect add/parameter setting for mod-host
     # A jack connection
     # Commands to send to griode
 
-    # The first (mod-host commands) start either with "add " or
-    # "param_set "
-
-    # The second starts with "echo "
-
-    # The third with "jack_connect"
-
-    # `mod-host` commands are sent via `nc`, the others via the shell
-    
+    # `mod-host` commands are sent via `nc`, the others using ``
+    `echo $cmd >> $history_fn`;
     $cmd =~ /^(\S+)\s+(.+)\s*$/ or die "$cmd ";
 
-    my $cmd = $1;
+    my $c = $1;
     my $rest = $2;
-
-    if($cmd eq "add" or $cmd eq "param_set"){
-	# `mod-host` command
-	my $N;
-	if($cmd eq "param_set"){
-	    # param_set 1 delay_base 30
-	    $rest =~ /^(\d+)\s/ or die $cmd;
-	    $N = $1;
-	}else{
-	    $rest =~ /(\d+)\s*$/ or die $cmd;
-	    $N = $1;
-	}
-	defined $N or die $cmd;
-	defined($state{$N}) or $state{$N}= {};
-	if($cmd eq "add"){
-	    # A url
-	    $rest =~ /^(http\S+)/ or die $cmd;
-	    $state{$N}->{URL} = $1;
-	}else{
-	    # Parameter
-	    $rest =~ /^$N\s(\S+)\s([\d\.]+)/ or die $cmd;
-	    my $name = $1;
-	    my $value = $2;
-	    $state{$N}->{$name} = $value;
-	}
-	
-
-	my $pid =
-	    open2(my $child_out, my $child_in, "/usr/bin/nc localhost $port");
-	defined $pid or die "$!: Fork failed";
-	
-	print "Sending command: $cmd";
-	print $child_in "$cmd $rest";
-
-	my $res = '';
-	while(1){
-	    read($child_out, $res, 1);
-	    if($res eq "\n"){
-		last;
-	    }
-	    if(ord($res) == 0){
-		last;
-	    }
-	    print $res;
-	    # FIXME  Process $res for errors
-	}
-	print "\n";
-	
-	kill 'HUP' , $pid;
-    }else{
-	# Just use the shell.  This would be a security hole a mile
-	# wide if anybody cared...
-	my $res = `$cmd`;
-	# FIXME Process $res for errors
+    my $res;
+    if($c eq "add" or $c eq "param_set"){
+	$res = mod_host($c, $rest);
+    }elsif($c eq "griode"){
+	open(my $out_fh, "|-", "/usr/bin/nc localhost $griode_port")
+	    or die $!;
+	print $out_fh "$rest";
+	$res = '';
+    }elsif($c eq 'jack'){
+	$res = `jack_connect $rest`;
     }
+    print $res;
 }
-&write_state_file( \%state );
+

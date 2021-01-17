@@ -115,6 +115,22 @@ See https://github.com/moddevices/mod-host
 
 When a plugin is added with `add` a new `jack` input and output is created for it.
 
+## `setup <file name`
+
+The `setup` programme reads commands form the file passed to set up
+the instrument.  There are three classes of command: `griode`, `jack` and `mod-host:[param_set|add]`
+
+### `griode` Commands
+
+* `scale`  Pass the scale in the form of a python int array.  This will control the colours of the LaunchPad pads.  Example: `griode scale [0, 3, 5, 7, 10]` is a blues scale
+
+* `instrument`
+
+The instrument to use.  This is a sound font.  Griode logs all available instruments at INFO level on startup.  The format is: `instrument <font> <programme> <bank> <name>` where `<name>` is any styring.  Example: seeing "Instrument: font 0 prorgramme: 24 bank 8 name Ukulele" in the log `griode instrument 0 24 8 TheUke` uses a ukulele
+
+### `mod-host` Commands
+
+`param_set` and `add` as in [https://github.com/moddevices/mod-host/blob/master/README.md](mod-host documentation) (https://github.com/moddevices/mod-host/blob/master/README.md)[mod-host documentation]
 
 ### Installing Python dependencies
 

@@ -3,6 +3,7 @@ import resource
 import time
 
 # For reading commands
+import socket
 import select 
 import os
 import errno
@@ -30,15 +31,17 @@ class Clock(object):
         self.tick = 0  # 24 ticks per quarter note
         self.next = time.time()
         self.cues = []
-        logging.debug("Opening command pipe");
-        self.commands = open(".griode.commands", 'r')
-        self.commandPoll = select.poll()
-        self.polledFiles = dict()
-        self.commandPoll.register(self.commands, select.POLLIN)
-        self.polledFiles[self.commands.fileno()] = self.commands
-        
-        logging.debug("Poll registered for command pipe.  Flag: {}".format(select.POLLIN));        
-        
+
+        self.command_port = 8887
+
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(("127.0.0.1", self.command_port))
+        self.server_socket.listen(1)
+        logging.info("Opened command socket on port {}".
+                     format(self.command_port))
+
+
+
     def cue(self, when, func, args):
         self.cues.append((self.tick+when, func, args))
 
@@ -57,26 +60,18 @@ class Clock(object):
             self.griode.looper.tick(self.tick)
             self.griode.cpu.tick(self.tick)
             self.griode.tick(self.tick)
-
+            
         # Check for commands from the Lord and Master
-        for fd, event in  self.commandPoll.poll(0):
-
-            # Got something
-            if event == select.POLLIN:
-                # A command to read
-                logging.debug("Got something")
-
-                N = os.fstat(fd).st_size
-                try:
-                    commandments = os.read(fd, 1024)
-                except OSError as err:
-                    if err.errno == errno.EAGAIN or err.errno == errno.EWOULDBLOCK:
-                        commandments = None
-                    else:
-                        raise
-
-                logging.debug("commandments: {}".format(commandments))
-
+        read_list = [self.server_socket]
+        readable, writable, errored = select.select(read_list, [], [], 0)
+        for s in readable:
+            if s is self.server_socket:
+                # Got something
+                client_socket, address = self.server_socket.accept()
+                # Hard limit on size of commandments
+                commandments = client_socket.recv(4096)
+                logging.info("Got {}  bytes: {}".
+                             format(len(commandments), commandments))
 
                 # Commands are seperated by \n
                 commands = commandments.split(b"\n")
@@ -89,9 +84,9 @@ class Clock(object):
                         # Empty strings are ignored
                         continue
                         
-                    logging.debug("commandment: {}".format(commandment))                    
+                    logging.info("commandment: {}".format(commandment))  
                     command, data = self.decodeCommandment(commandment)
-                    logging.debug("command: {} data {}".format(command, data))
+                    logging.info("command: {} data {}".format(command, data))
                     if command == b"scale":
                         logging.debug("Setting scale.  Was: {}".
                                       format(self.griode.theScale()))

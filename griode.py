@@ -48,17 +48,25 @@ class Griode(object):
     def __init__(self):
         persistent_attrs_init(self)
         self.synth = Fluidsynth()
+        logging.debug("...")
 
         # 16 channels.  One DeviceChain for each channel.  Each
         # DeviceChain has a `Latch` and `Arpeggiator`
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
 
+        logging.debug("...")
         self.grids = []
+        logging.debug("...")
         self.scale = [0, 3, 6, 7, 10]
+        logging.debug("...")
         self.cpu = CPU(self)
+        logging.debug("...")
         self.clock = Clock(self)
+        logging.debug("...")
         self.looper = Looper(self)
+        logging.debug("...")
         self.mixer = Mixer(self)
+        logging.debug("...")
         self.detect_devices()
         # FIXME: probably make this configurable somehow (env var...?)
         if False:

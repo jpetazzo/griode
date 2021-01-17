@@ -27,7 +27,8 @@ class Instrument(object):
         self.is_drumkit = None  # True for drumkits, False for others
         self.font_index = None  # this is a UI value; starts at 0
         self.bank_index = None  # this is a UI value; starts at 0
-
+        logging.info("Instrument: font {} programme: {} bank {} name {}"
+                     .format(font, program  , bank, name))
     def messages(self):
         """Generate MIDI messages to switch to that instrument."""
         return [
