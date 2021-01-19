@@ -79,7 +79,7 @@ foreach my $url (@lv2_urls){
     print $out  "{\n".'  "url":"'.$url.'",'."\n".'  "class":"'.$class.'",'."\n".'  "name":"'.$name.'",'."\n";
     print $out '  "Ports":['."\n"; 
     my $ports = "";
-    foreach my $port (keys %port_data){
+    foreach my $port (sort {$a <=> $b} keys %port_data){
 	$ports .= "    {\n";
 	$ports .= '      "Port":'.$port.",\n";
 	$ports .= '      "Name":"'.$port_data{$port}->{Name}.'"'.",\n";
