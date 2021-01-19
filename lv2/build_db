@@ -21,16 +21,28 @@ foreach my $url (@lv2_urls){
     foreach my $l (@info){
 
 	chomp $l;
-	$l =~ /\S/ or next;
 	
 	if($l =~ /^http:/){
 	    $l eq $url or die "$l ne $url";
 	    next;
 	}
+	if($state eq 'start' and $l =~ /^\s+UIs:\s*$/){
+	    $state = 'UI';
+	    next;
+	}
+	if($state eq 'UI' and $l =~ /^\s+Data\s+URIs:\s+/){
+	    $state = 'start';
+	    next;
+	}
+	if($state eq 'UI' and $l =~ /^\s+Port \d+:\s*$/){
+	    die $l;
+	}
 	if($state eq "start" and $l =~ /^\s+Name:\s+(.+)\s*$/){
 	    $name = $1;
 	    next;
 	}elsif($state eq "start" and $l =~ /^\s+Class:\s+(.+)\s*$/){
+	    # Getting the class of a plugin is fraught.  About half
+	    # doe not have a useful class,
 	    my $c = $1;
 	    if($c =~ /plug.in/){
 		# Generic class with no information
@@ -45,15 +57,35 @@ foreach my $url (@lv2_urls){
 	    $state = "port";
 	    defined($port_data{$port}) or $port_data{$port} = {}; 
 	    next;
-	}elsif($state eq "port" and $l =~ /^\s+Type:\s+http:.+\#(.+)\s*$/){
-	    $port_data{$port}->{Type} = $1;
-	    next;
-	}elsif($state eq "port" and $l =~ /^\s+Symbol:\s+(\S+)\s*$/){
-	    $port_data{$port}->{Symbol} = $1;
-	    next;
-	}elsif($state eq "port" and $l =~ /^\s+Name:\s+(.+)\s*$/){
-	    $port_data{$port}->{Name} = $1;
-	    next;
+	}elsif($state eq 'port'){
+	    if($l =~ /^\s+Type:\s+http:.+\#(.+)\s*$/){
+		$port_data{$port}->{Type} = $1;
+		next;
+	    }elsif($l =~ /^\s+Symbol:\s+(\S+)\s*$/){
+		$port_data{$port}->{Symbol} = $1;
+		next;
+	    }elsif($l =~ /^\s+Name:\s+(.+)\s*$/){
+		$port_data{$port}->{Name} = $1;
+		next;
+	    }elsif($state eq 'port' and $l =~ /^\s+Scale Points:\s*$/){
+		$state = 'scale points';
+		$port_data{$port}->{scale_points} = {};
+		next;
+	    }elsif($l =~ /^\s+Minimum:\s+([0-9\.]+)\s*$/){
+		$port_data{$port}->{minimum} = $1;
+	    }elsif($l =~ /^\s+Maximum:\s+([0-9\.]+)\s*$/){
+		$port_data{$port}->{maximum} = $1;
+	    }elsif($l =~ /^\s+Default:\s+([0-9\.]+)\s*$/){
+		$port_data{$port}->{default} = $1;
+	    }
+	}elsif($state eq 'scale points'){
+	    if($l =~ /^\s*$/){
+		$state = 'port';
+		next;
+	    }elsif($l =~ /^\s+([\d\.]+)\s+=\s+\"([^\"]+)\"\s*$/){
+		$port_data{$port}->{scale_points}->{$1} = $2;
+		next;
+	    }
 	}
     }
 
@@ -85,6 +117,22 @@ foreach my $url (@lv2_urls){
 	$ports .= '      "Name":"'.$port_data{$port}->{Name}.'"'.",\n";
 	$ports .= '      "Type":"'.$port_data{$port}->{Type}.'"'.",\n";
 	$ports .= '      "Symbol":"'.$port_data{$port}->{Symbol}.'"'."\n";
+	if(defined($port_data{$port}->{scale_points})){
+	    foreach my $sp (sort {$a <=> $b}
+			    keys %{$port_data{$port}->{scale_points}}){
+		$ports .= '      "sp'.$sp.'":"' .
+		    $port_data{$port}->{scale_points}->{$sp}."\"\n";
+	    }
+	}
+	if(defined($port_data{$port}->{minimum})){
+	    $ports .= '      "minimum":"'.$port_data{$port}->{minimum}."\"\n";
+	}
+	if(defined($port_data{$port}->{maximum})){
+	    $ports .= '      "maximum":"'.$port_data{$port}->{maximum}."\"\n";
+	}
+	if(defined($port_data{$port}->{default})){
+	    $ports .= '      "default":"'.$port_data{$port}->{default}."\"\n";
+	}
 	$ports .= "    },\n";
     }
 
