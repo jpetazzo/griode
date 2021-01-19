@@ -109,6 +109,7 @@ foreach my $cmd (@commands){
     ## Comments and blank lines
     $cmd =~ /^\s*\#/ and next;
     $cmd =~ /\S/ or next;
+    chomp $cmd;
     
     # Three sorts of command:
     # 1 Effect add/parameter setting for mod-host
