@@ -96,7 +96,11 @@ my @jack = ();
 # Else a file name that holds commannds to initialise a instrument
 
 my $command_fn = shift or die "No file name passed";
-if($command_fn eq 'mh'){
+if($command_fn eq 'G'){
+    # Send a command to griode
+    my $args = join ' ', @ARGV;
+    push @griode, $args;
+}elsif($command_fn eq 'mh'){
     my $n = shift or die;
     my $s = shift or die;
     my $v = shift;
