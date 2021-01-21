@@ -20,7 +20,9 @@ my $griode_port = 8887;
 
 # The history file keeps track of what changes this has made to jack
 # and mod-host that have to be undone next run
-my $history_fn = '.history';
+my $pwd = `pwd`;
+chomp $pwd;
+my $history_fn = $pwd.'/.history';
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
@@ -84,6 +86,12 @@ sub mod_host( $ ){
     kill 'HUP' , $pid;
 }    
 
+sub write_history( @ ) {
+    open(my $out, ">>$history_fn") or die $!;
+    foreach my $l (@_) {
+	print $out "$l\n";
+    }
+}
 
 # Place tostore commands before being executed.
 my @griode = ();
@@ -143,7 +151,6 @@ if($command_fn eq 'G'){
 	# Commands to send to griode
 
 	# `mod-host` commands are sent via `nc`, the others using ``
-	`echo $cmd >> $history_fn`;
 	$cmd =~ /^(\S+)\s+(.+)\s*$/ or die "$cmd ";
 
 	my $c = $1;
@@ -167,13 +174,16 @@ if(@griode){
 	or die $!;
     map {print $out_fh "$_\n"} @griode;
     close $out_fh or die $!;
+    write_history(map{'griode '.$_} @griode);
 }
 if(@modhost){
-warn "mod-host\n";
-mod_host(\@modhost);
+    warn "mod-host\n";
+    mod_host(\@modhost);
+    write_history(map{'mod-host '.$_} @modhost);
 }
 if(@jack){
     warn "jack\n";
     map{print `jack_connect $_`} @jack;
+    write_history(map{'jack '.$_} @jack);
 }
 
