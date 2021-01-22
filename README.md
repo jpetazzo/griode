@@ -128,6 +128,14 @@ the instrument.  There are three classes of command: `griode`, `jack` and `mod-h
 
 The instrument to use.  This is a sound font.  Griode logs all available instruments at INFO level on startup.  The format is: `instrument <font> <programme> <bank> <name>` where `<name>` is any styring.  Example: seeing "Instrument: font 0 prorgramme: 24 bank 8 name Ukulele" in the log `griode instrument 0 24 8 TheUke` uses a ukulele
 
+* `draw`
+
+Redraw the Launchpad pads
+ 
+* `root <N>`
+
+Set the root note of the scale.  N is midi note: 48 is C.  Notes defined [here](http://computermusicresource.com/midikeys.html)
+
 ### `mod-host` Commands
 
 `param_set` and `add` as in [mod-host documentation](https://github.com/moddevices/mod-host/blob/master/README.md) 
@@ -143,7 +151,7 @@ param_set 1 detune 5
 
 Adds in the effrect `multivoiceChorus` as `effect_1`
 
-### `jaqck` Commands
+### `jack` Commands
 
 To stich the audio together use `jack` commands with the components to link.
 
@@ -151,28 +159,32 @@ The components built in are:
 
 * fluidsynth
 The synth that used the sound fonmts to generate the audoi.  It has two outputs for stereo
-.* fluidsynth:left
 
-.* fluidsynth:right
+1. fluidsynth:left
+
+2. fluidsynth:right
 
 * system
 
 There are two channels of input and two channels of output
 
-.* Input
+1. Input
 
-..* system:capture_1
+.* system:capture_1
 
-..* system:capture_2
+.* system:capture_2
 
-.* Output
+2. Output
 
-..* system:playback_1
+.* system:playback_1
 
-..* system:playback_2
+.* system:playback_2
 
 
-The `mod-host` effects have jack audio sockets as `effect_N:input` and `effect_N:output` (where `N` is the instrument number allocated with the `add` command.
+Jack socket names have the format `<system>:<device>`.  The `mod-host`
+jack sockets are `effect_N:SYMBOL` where `N` is the instrument number
+allocated with the `add` command and SYMBOL is the symbol for that
+port.
 
 
 Example
