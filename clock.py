@@ -98,7 +98,12 @@ class Clock(object):
                                           format(self.griode.theScale()))
                         except:
                             logging.info("data: '{}' invalid".format(data))
-                        
+
+                    elif command == b"root":
+                        new_root = int(data)
+                        for g in self.griode.grids:
+                            g.notepickers[g.channel].root = new_root
+                            
                     elif command == b"draw":
                         # Redraw the screen
                         for g in self.griode.grids:
@@ -110,7 +115,8 @@ class Clock(object):
                         # Adding a instrument
                         args = data.split()
                         instrument = Instrument(int(args[0]),
-                                                int(args[1]), int(args[2]),
+                                                int(args[1]),
+                                                int(args[2]),
                                                 str(args[3]))
                         for device in self.griode.devicechains:
                             device.program_change_instrument(instrument)
