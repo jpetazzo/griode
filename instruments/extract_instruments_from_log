@@ -1,0 +1,27 @@
+#!/usr/bin/perl -w
+use strict;
+
+# Read the log `griode` writes (at INFO level) and build the database
+# of instruments gherein
+
+my $log_fn = shift or die;
+-r $log_fn or die "$!: Cannot read '$log_fn'";
+
+open(my $in, $log_fn) or die $!;
+
+my @instruments = ();
+foreach my $line (<$in>){
+    chomp $line;
+    if($line =~ /Instrument: font (\d+) programme: (\d+) bank (\d+) name (.+)\s*$/) {
+	my $f = $1;
+	my $p = $2;
+	my $b = $3;
+	my $n = $4;
+	$n =~ s/\s/_/g;
+
+	push(@instruments, "$f $p $b $n");
+    }
+}
+
+open(my $out, ">instruments.db") or die $!;
+print $out join("\n", @instruments)."\n";
