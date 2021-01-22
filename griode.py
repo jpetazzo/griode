@@ -56,18 +56,13 @@ class Griode(object):
 
         logging.debug("...")
         self.grids = []
-        logging.debug("...")
         self.scale = [0, 3, 6, 7, 10]
-        logging.debug("...")
         self.cpu = CPU(self)
-        logging.debug("...")
         self.clock = Clock(self)
-        logging.debug("...")
         self.looper = Looper(self)
-        logging.debug("...")
         self.mixer = Mixer(self)
-        logging.debug("...")
         self.detect_devices()
+
         # FIXME: probably make this configurable somehow (env var...?)
         if False:
             from termpad import ASCIIGrid
