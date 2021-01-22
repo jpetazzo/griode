@@ -51,7 +51,7 @@ my $history_fn = $pwd.'/.history';
 
 #
 
-# Read in history
+
 sub mod_host( $ ){
     my $cmds = shift or die;
     my @cmds = @$cmds;
@@ -119,7 +119,7 @@ foreach my $line (@stdin){
     $line =~ /^\s*\#/ and next;
     chomp $line;
     
-    $line =~ /^(\S+)\s+(.+)/ or die $line;
+    $line =~ /^(\S+)(\s.*)?/ or die $line;
     my $arg1 = $1;
     my $args = defined($2) ? $2 : "";
     
@@ -128,10 +128,10 @@ foreach my $line (@stdin){
 	push @griode, $args;
     }elsif($arg1 eq 'mh'){
 	$args =~ /^(\S+)\s+(\S+)\s+(\S+)\s*$/ or die $args;
-	my $n = $1;
-	my $s = $2;
-	my $v = $3;
-	push(@modhost, ["param_set", "$n $s $v"]);
+	# my $n = $1;
+	# my $s = $2;
+	# my $v = $3;
+	push(@modhost, ["param_set", $args]);
     }else{
 	my $command_fn = $arg1;
 	-r $command_fn or die "$!: Cannot read file: $command_fn";
@@ -198,7 +198,7 @@ foreach my $line (@stdin){
     if(@modhost){
 	warn "mod-host\n";
 	mod_host(\@modhost);
-	write_history(map{'mod-host '.$_} @modhost);
+	write_history(map{'mod-host '. join(' ', @$_)} @modhost);
     }
     if(@jack){
 	warn "jack\n";
