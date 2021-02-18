@@ -42,7 +42,7 @@ def handler(signum, frame):
 signal.signal(signal.SIGUSR2, handler)
     
 #@persistent_attrs(key=notes.C, scale=scales.MAJOR)
-@persistent_attrs(key=notes.C)
+
 class Griode(object):
 
     def __init__(self):
@@ -54,6 +54,9 @@ class Griode(object):
         # DeviceChain has a `Latch` and `Arpeggiator`
         self.devicechains = [DeviceChain(self, i) for i in range(16)]
 
+        ## The root of all notes.
+        self.key=notes.A
+        
         logging.debug("...")
         self.grids = []
         self.scale = [0, 3, 6, 7, 10]
