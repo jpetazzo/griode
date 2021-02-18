@@ -5,17 +5,10 @@ use Fcntl;
 use Symbol 'gensym'; # vivify a separate handle for STDERR
 use File::Spec;
 
-# Set up the parameters of a instrument.  Set up LV2 effects, JACK
-# connections, and GRIODE parameters
-
-# A file of commands is prepared and the file name passed to this
-# programme
-
 # Communication with other programmes.  `mod_host` handles LV2
 # effects.  `griode` runs the Launchpad X controller.
 my $mod_host_port = 5555;
 my $griode_port = 8887;
-
 
 
 # The history file keeps track of what changes this has made to jack
@@ -26,6 +19,69 @@ my $history_fn = $pwd.'/.history';
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
+
+
+sub mod_host( $ ){
+    my $cmds = shift or die;
+    my @cmds = @$cmds;
+
+    my $pid =
+	open2(my $child_out, my $child_in, "/usr/bin/nc localhost $mod_host_port");
+    defined $pid or die "$!: Fork failed";
+
+    foreach my $cmd (@cmds){
+	my $cmd_str = "$cmd->[1]";
+	print "mod-host: $cmd_str\n";
+	print $child_in "$cmd_str\n";
+
+	my $result = '';
+	while(1){
+	    my $res = '';
+	    read($child_out, $res, 1);
+
+	    if($res eq "\n"){
+		last;
+	    }
+	    if(ord($res) == 0){
+		last;
+	    }
+	    $result .=  $res;
+	    # FIXME  Process $res for errors
+	}
+	$result =~ /resp ([\-0-9]+)/ or warn "ERROR: $cmd_str -- '$result'\n";
+	if($1 < 0){
+	    warn ">> $result";
+	}
+    }
+    kill 'HUP' , $pid;
+}    
+
+sub write_history( @ ) {
+    open(my $out, ">>$history_fn") or die $!;
+    foreach my $l (@_) {
+	print $out "$l\n";
+    }
+}
+
+sub consume_stdin() {
+    my $offset = 0;
+    my $buffer;
+    while(read(STDIN,  $buffer, 1, $offset++)){};
+    return split(/\n/, $buffer);
+}
+
+
+#--------------------------------------------------------
+#--------------------------------------------------------
+#--------------------------------------------------------
+# Set up the parameters of a instrument.  Set up LV2 effects, JACK
+# connections, and GRIODE parameters
+
+# A file of commands is prepared and the file name passed to this
+# programme
+
+
+
 
 # The mod-host works having a set of "effects".  Each one is added
 # with the command:
@@ -52,56 +108,17 @@ my $history_fn = $pwd.'/.history';
 #
 
 
-sub mod_host( $ ){
-    my $cmds = shift or die;
-    my @cmds = @$cmds;
-    # `mod-host` command
-
-    my $pid =
-	open2(my $child_out, my $child_in, "/usr/bin/nc localhost $mod_host_port");
-    defined $pid or die "$!: Fork failed";
-    #print "Sending command: $c";
-    foreach my $cmd (@cmds){
-	print $child_in "$cmd->[0] $cmd->[1]\n";
-
-	my $result = '';
-	while(1){
-	    my $res = '';
-	    read($child_out, $res, 1);
-
-	    if($res eq "\n"){
-		last;
-	    }
-	    if(ord($res) == 0){
-		last;
-	    }
-	    $result .=  $res;
-	    # FIXME  Process $res for errors
-	}
-	$result =~ /resp ([\-0-9]+)/ or die "'$result'";
-	# if($1 < 0){
-	    print ">> $result\n";
-	# }
-    }
-    kill 'HUP' , $pid;
-}    
-
-sub write_history( @ ) {
-    open(my $out, ">>$history_fn") or die $!;
-    foreach my $l (@_) {
-	print $out "$l\n";
-    }
+my @stdin;
+if(scalar(@ARGV) == 0){
+    # No argument.  Read stdin
+    
+    @stdin = consume_stdin();
+}elsif(scalar(@ARGV) == 1){
+    # One arg, a path
+    open(my $in, $ARGV[0]) or die "$!: $ARGV[0]";
+    @stdin = <$in>;
 }
-
-sub consume_stdin() {
-    my $offset = 0;
-    my $buffer;
-    while(read(STDIN,  $buffer, 1, $offset++)){};
-    return split(/\n/, $buffer);
-}
-
-my @stdin = consume_stdin();
-print join("\n", @stdin)."\n---\n";
+#print join("\n", @stdin)."\n---\n";
 
 
 # Place tostore commands before being executed.
@@ -123,88 +140,71 @@ foreach my $line (@stdin){
     my $arg1 = $1;
     my $args = defined($2) ? $2 : "";
     
-    if($arg1 eq 'G'){
+    if($arg1 eq 'griode'){
 	# Send a command to griode
-	push @griode, $args;
+	push(@griode, $args);
     }elsif($arg1 eq 'mh'){
-	$args =~ /^\s*(\S+)\s+(\S+)\s+(\S+)\s*$/ or die $args;
-	my $n = $1;
-	my $s = $2;
-	my $v = $3;
-	warn "$n $s $v";
-	push(@modhost, ["param_set", $args]);
-    }else{
-	my $command_fn = $arg1;
-	-r $command_fn or die "$!: Cannot read file: $command_fn";
-	open(my $in, $command_fn) or die "$!: Cannot open $command_fn";
-	my @commands = <$in>;
-	close($in);
-	warn "Read commands\n";
-
-	# Read history and undo commands run earlier and undo them
-	my @history = `cat $history_fn`;
-	unlink $history_fn;
-	my @jack_hist = ();
-	my @modh_hist = ();
-
-	foreach my $cmd (@history) {
-	    # jack and mod-host commands are the only ones we need to undo
-	    if($cmd =~ /^jack\s(\S+ \S+)\s*$/){
-		push(@jack_hist, $1);
-	    }elsif($cmd =~ /add\s\S+\s+(\d+)\s*$/){
-		push(@modh_hist, $1);
-	    }	    
+	# Could be a `add` instruction to create a mod-host efect or
+	# `param_set` to set parameters
+	if($args =~ /^\s*(add)\s+.+$/){
+	    push(@modhost, ["add", $args]);
+	}elsif($args =~ /^\s*param_set\s/){
+	    push(@modhost, ["param_set", $args]);
+	}elsif($args =~ /^\s*remove\s/){
+	    push(@modhost, ["remove", $args]);
 	}
-	map {print `jack_disconnect $_`} @jack_hist;
-	map{ print mod_host([["remove", $_]])} @modh_hist;
-	warn "Deleted history\n";
-	foreach my $cmd (@commands){
-	    
-	    ## Comments and blank lines
-	    $cmd =~ /^\s*\#/ and next;
-	    $cmd =~ /\S/ or next;
-	    chomp $cmd;
-	    
-	    # Three sorts of command:
-	    # 1 Effect add/parameter setting for mod-host
-	    # A jack connection
-	    # Commands to send to griode
+    }elsif($arg1 eq 'jack'){
+	push(@jack, $args);
+    }elsif($arg1 eq 'clear'){
+	# If there is no history there is nothing to clear
+	my $s = -s $history_fn;
+	# if($s == 0){
+	#     next;
+	# }
+	if($s > 0){
+	    # Read history and undo commands run earlier and undo them
+	    my @history = `cat $history_fn`;
 
-	    # `mod-host` commands are sent via `nc`, the others using ``
-	    $cmd =~ /^(\S+)\s+(.+)\s*$/ or die "$cmd ";
+	    my %jack_hist = ();
+	    my %modh_hist = ();
 
-	    my $c = $1;
-	    my $rest = $2;
-	    my $res;
-	    if($c eq "add" or $c eq "param_set"){
-		push(@modhost, [$c, $rest]);
-		# $res = mod_host($c, $rest);
-	    }elsif($c eq "griode"){
-		push(@griode, $rest);
-	    }elsif($c eq 'jack'){
-		push(@jack, $rest);
-		# $res = `jack_connect $rest`;
+	    foreach my $cmd (@history) {
+		# jack and mod-host commands are the only ones we need to undo
+		if($cmd =~ /^jack\s(\S+ \S+)\s*$/){
+		    $jack_hist{$1} = $1;
+		}elsif($cmd =~ /add\s\S+\s+(\d+)\s*$/){
+		    $modh_hist{$1} = $1;
+		}	    
 	    }
+	    map {print `jack_disconnect $_`} keys %jack_hist;
+	    map{ print mod_host([["remove", "remove $_"]])} keys %modh_hist;
+	    warn "Deleted history\n";
+
+	    unlink $history_fn;
 	}
+    }else{
+	die $arg1;
     }
-
-    if(@griode){
-	warn "Griode\n";    
-	open(my $out_fh, "|-", "/usr/bin/nc localhost $griode_port")
-	    or die $!;
-	map {print $out_fh "$_\n"} @griode;
-	close $out_fh or die $!;
-	write_history(map{'griode '.$_} @griode);
-    }
-    if(@modhost){
-	warn "mod-host\n";
-	mod_host(\@modhost);
-	write_history(map{'mod-host '. join(' ', @$_)} @modhost);
-    }
-    if(@jack){
-	warn "jack\n";
-	map{print `jack_connect $_`} @jack;
-	write_history(map{'jack '.$_} @jack);
-    }
-
 }
+
+if(@griode){
+    warn "Griode\n";    
+    open(my $out_fh, "|-", "/usr/bin/nc localhost $griode_port")
+	or die $!;
+    map {print $out_fh "$_\n"} @griode;
+    close $out_fh or die $!;
+    write_history(map{'griode '.$_} @griode);
+}
+if(@modhost){
+    print "mod-host\n";
+    my $start  = time();
+    mod_host(\@modhost);
+    print "mod-host: ".(time() - $start) . " seconds\n";
+    write_history(map{'mod-host '. join(' ', @$_)} @modhost);
+}
+if(@jack){
+    warn "jack\n";
+    map{print `jack_connect $_`} @jack;
+    write_history(map{'jack '.$_} @jack);
+}
+
