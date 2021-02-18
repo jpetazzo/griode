@@ -102,7 +102,7 @@ class Clock(object):
                     elif command == b"root":
                         new_root = int(data)
                         for g in self.griode.grids:
-                            g.notepickers[g.channel].root = new_root
+                            g.notepickers[g.channel].offset = new_root
                             
                     elif command == b"draw":
                         # Redraw the screen

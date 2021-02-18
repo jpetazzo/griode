@@ -35,7 +35,7 @@ Drumkit = enum.Enum("Drumkit", list(DRUMKIT_MAPPINGS.keys()))
 
 
 
-@persistent_attrs(root=48,
+@persistent_attrs(
                   drumkit_mapping=Drumkit.FOUR_EIGHT,
                   melodic_mapping=Melodic.CHROMATIC)
 class NotePicker(Gridget):
@@ -43,6 +43,10 @@ class NotePicker(Gridget):
     def __init__(self, grid, channel):
         self.grid = grid
         self.surface = Surface(grid.surface)
+
+        # Root and offset define what midi note is sent
+        self.root=21
+        self.offset=0
         for button in "UP DOWN LEFT RIGHT".split():
             self.surface[button] = palette.CHANNEL[channel]
         self.channel = channel
@@ -84,11 +88,13 @@ class NotePicker(Gridget):
         # If we are in diatonic mode, we force the root key to be the root
         # of the scale, otherwise the whole screen will be off.
         # FIXME: allow to shift the diatonic mode.
+        logging.info("Here: {}".format(self.mapping))
         if self.mapping == Melodic.DIATONIC:
             root = self.root//12 * 12 + self.grid.griode.key
         else:
             root = self.root
         self.led2note.clear()
+
         for led in self.surface:
             if isinstance(led, tuple):
                 row, column = led
@@ -112,12 +118,14 @@ class NotePicker(Gridget):
                         note = padmap[::-1][row-1][column-1]
                     except IndexError:
                         note = None
+                note = note + self.offset
                 self.led2note[led] = note
         self.note2leds.clear()
         for led, note in self.led2note.items():
             if note not in self.note2leds:
                 # Why? What is this array?  All the `led`s for the
-                # `note`
+                # `note` This says which pads (`leds`) are lit up when
+                # a note is generated
                 self.note2leds[note] = []
             self.note2leds[note].append(led)
         self.draw()
@@ -152,7 +160,7 @@ class NotePicker(Gridget):
                 self.surface[led] = color
 
     def button_pressed(self, button):
-        logging.debug("button: {}".format(button))
+        logging.info("button: {}".format(button))
         # FIXME allow to change layout for DRUMKIT? Or?
         if button == "UP":
             self.root += 12
@@ -170,6 +178,8 @@ class NotePicker(Gridget):
             return
         # Velocity curve (this is kind of a hack for now)
         # FIXME this probably should be moved to the devicechains
+        logging.info("Here: {} {} {} Note: {} offset: {}"
+                     .format(row, column, velocity, note, self.offset))
         if velocity > 0:
             velocity = 63 + velocity//2
         # Send that note to the message chain
@@ -184,14 +194,24 @@ class NotePicker(Gridget):
 
     def send(self, message, source_object):
         if message.type == "note_on":
+
+            # User is playing a note            
             if message.velocity == 0:
+                # ??? What does it mean when the velocity is 0?
+
                 color = self.note2color(message.note)
             elif source_object == self:
                 color = palette.PLAY[0]
             else:
                 color = palette.PLAY[1]
+                
+            # The pads that play this note    
             leds = self.note2leds[message.note]
+            logging.info("Leds {} "
+                         .format(leds))
             for led in leds:
+                logging.info("Led {} Color {} "
+                             .format(led, color))
                 self.surface[led] = color
 
 ##############################################################################
@@ -269,6 +289,7 @@ class InstrumentPicker(Gridget):
         return leds
 
     def pad_pressed(self, row, col, velocity):
+        logging.info("Here: {} {} {}".format(row, column, velocity))
         current_is_drumkit = self.devicechain.instrument.is_drumkit
         if row in [1, 2, 3]:
             self.grid.notepickers[self.channel].pad_pressed(row, col, velocity)
@@ -298,7 +319,7 @@ class InstrumentPicker(Gridget):
             self.grid.notepickers[self.channel].mode(new_is_drumkit)
 
     def button_pressed(self, button):
-        logging.debug("button: {}".format(button))
+        logging.info("button: {}".format(button))
         if button == "LEFT" and self.channel>0:
             self.grid.channel = self.channel-1
             self.grid.focus(self.grid.instrumentpickers[self.channel-1])
@@ -403,6 +424,7 @@ class ScalePicker(Gridget):
             cue(duration*(i+1), send, (message.copy(velocity=0), ))
 
     def pad_pressed(self, row, column, velocity):
+        logging.info("Here: {} {} {}".format(row, column, velocity))
         if velocity == 0:
             return
 
@@ -470,5 +492,6 @@ class ColorPicker(Gridget):
 
     def pad_pressed(self, row, column, velocity):
         if velocity > 0:
+            logging.info("Here: {} {} {}".format(row, column, velocity))
             color = (row-1)*8 + column-1
             print("Color #{}".format(color))
