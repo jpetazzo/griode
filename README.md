@@ -118,9 +118,13 @@ When a plugin is added with `add` a new `jack` input and output is created for i
 ## `setup <file name>`
 
 The `setup` programme reads commands form the file passed to set up
-the instrument.  There are three classes of command: `griode`, `jack` and `mod-host:[param_set|add]`
+the instrument.  There are three classes of command: `griode`, `jack` and `mh:[param_set|add]`
+
+
+Lines that start with `griode ` are passed to `griode`, lines that start with `mh ` are passed to `mod-host `, and lines starting with `jack` are passed to `jack`
 
 ### `griode` Commands
+
 
 * `scale`  Pass the scale in the form of a python int array.  This will control the colours of the LaunchPad pads.  Example: `griode scale [0, 3, 5, 7, 10]` is a blues scale
 
@@ -196,9 +200,25 @@ jack effect_1:output system:playback_1
 jack effect_1:output system:playback_2
 ```
 
-### 
+### Command `clear` 
 
-### Installing Python dependencies
+On a line by irself `clear` undos all the `jack` and `mod-host` settings
+
+
+## Frontend
+
+In directory `frontend`
+
+
+### Server
+
+cargo run --bin server --features server
+
+### Client
+
+In directory `frontend` run: `simple-http-server``
+
+## Installing Python dependencies
 
 On Debian/Ubuntu systems, you will need the following system packages,
 so that the `python-rtmidi` Python package can be installed correctly:
