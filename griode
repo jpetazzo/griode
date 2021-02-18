@@ -20,13 +20,6 @@ if(!$mod_host_running){
     }
 }
 
-# Check for command pipe
-my $cmdPipe = '.griode.commands';
-if(! -p $cmdPipe ){
-    -e $cmdPipe and unlink $cmdPipe; # Some file where pipe will be created
-    print `mkfifo $cmdPipe`;
-}
-
 # Check if jack running
 my $res =`jack_wait -c 2>/dev/null`;
 chomp $res;
@@ -49,6 +42,6 @@ if(!$running){
 wait;
 
 # Clean up
-unlink($cmdPipe);
+#unlink($cmdPipe);
 
 
