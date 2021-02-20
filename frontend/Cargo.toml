@@ -1,0 +1,49 @@
+[package]
+version = "0.1.0"
+name = "frontend"
+repository = "https://github.com/seed-rs/seed-quickstart"
+authors = ["Worik <root@worik.org>, Markus Kohlhase <markus.kohlhase@slowtec.de>"]
+description = "Front end for my musical instrument"
+categories = ["???"]
+license = "GPL3"
+readme = "./README.md"
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/client.rs"
+
+[[bin]]
+name = "server"
+path = "src/server.rs"
+
+[dependencies]
+# common
+serde = { version = "1.0.117", features = ["derive"] }
+serde_json = "1.0.59"
+rmp-serde = "0.14.4"
+web-sys = { version = "0.3", features = ["HtmlElement", "CssStyleDeclaration"] }
+# server
+ws = { version = "0.9.1", optional = true }
+
+#client
+seed = "0.8.0" #seed = { version = "0.8.0", optional = true}
+
+[features]
+# default = []
+# client = ["seed"]
+server = ["ws"]
+CssStyleDeclaration = []
+EventTarget = []
+Node = ["EventTarget"]
+Element = ["EventTarget", "Node"]
+HtmlElement = ["Element", "EventTarget", "Node"]
+
+[profile.release]
+lto = true
+opt-level = 'z'
+codegen-units = 1
+
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = ['-Os']
+# wasm-opt = false
