@@ -2,7 +2,7 @@ use ws::{listen, CloseCode, Handler, Message, Request, Response,
 	 Result, ErrorKind, Error, Sender};
 use std::fs::File;
 use std::io::prelude::*;
-
+use std::process::Command;
 // https://docs.rs/ws/
 
 
@@ -25,16 +25,18 @@ impl Server {
 	// Find the direcory with the instrument data in it.
 	let current_dir = env::current_dir().unwrap();
 	let dir = current_dir.parent().unwrap();
-	let dir_name = dir.to_str().unwrap().to_string() + "/../songs";
-	let list_name = dir.to_str().unwrap().to_string() + "/../songs/LIST";
+	let dir_name = dir.to_str().unwrap().to_string() + "/songs";
+	let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
 
 	let mut list_d = String::new();
 	println!("list_name: {}", list_name);
 	File::open(list_name.as_str()).unwrap().read_to_string(&mut list_d).unwrap();
-	let  song_names:Vec<&str> = list_d.as_str().lines().filter(|x| x
-								   .split_whitespace()
-								   .next().unwrap_or("#")
-								   .bytes().next().unwrap() != b'#').collect();
+	let  song_names:Vec<&str> =
+	    list_d.as_str().lines().filter(|x| x
+					   .split_whitespace()
+					   .next().unwrap_or("#")
+					   .bytes().next()
+					   .unwrap() != b'#').collect();
 	
 	println!("Songs: {}", song_names.iter().fold(String::new(), |a, b| format!("{} {}", a, b)));
 
@@ -51,13 +53,12 @@ impl Server {
 	
 	// The names to give instruments.  Limited number that can be
 	// displayed at any time, of course
-	let name = vec!["A", "B", "C", "D", "E", "F", "G"];
+	// let name = vec!["A", "B", "C", "D", "E", "F", "G"];
 
 	// Todo Remember this between invocations
 	self.current_instrument = song_names[0].to_string();
 
 
-	let mut key = 0;
 	for entry in dir.read_dir().expect("read_dir call failed") {
 	    if let Ok(entry) = entry {
 		// entry is std::fs::DirEntry
@@ -71,12 +72,8 @@ impl Server {
 			print!("Song name: {} ", song_name);
 			if song_names.contains(&song_name.as_ref()) {
 			    println!("In");
-			    self.settings.insert(name[key].to_string(),
+			    self.settings.insert(song_name.clone(),
 						 PathBuf::from(song_name));
-			    key += 1;
-			    if key == name.len() {
-				break;
-			    }
 			}else{
 			    println!("Out");
 			}			    
@@ -90,10 +87,32 @@ impl Server {
     }
 }    
 
-fn set_instrument(p:PathBuf){
+fn get_dir() -> String {
+    let current_dir = env::current_dir().unwrap();
+    let dir = current_dir.parent().unwrap();
+    dir.to_str().unwrap().to_string() + "/songs"
+}
 
-    
-    println!("set_instrument: {:?}", p);
+fn set_instrument(p:PathBuf) -> String {
+
+    let dir_name = get_dir();
+    let instrument = p.as_os_str().to_str().unwrap().to_string();
+    let file_path = format!("{}/{}",
+			    dir_name,
+			    &instrument);
+
+    let exec_name = format!("{}/control", env::current_dir().unwrap()
+	.parent().unwrap().to_str().unwrap());    
+    let cmd = format!("{} {}", exec_name, file_path);
+    let mut child = Command::new(exec_name.as_str())
+	.arg(file_path.as_str())
+	.spawn()
+	.expect("Failed");
+    let ecode = child.wait()
+                 .expect("failed to wait on child");
+    assert!(ecode.success());
+    println!("set_instrument: {}", cmd);
+    instrument
 }
 impl Handler for Server {
     fn on_request(&mut self, req: &Request) -> Result<Response> {
@@ -126,15 +145,14 @@ impl Handler for Server {
 		    match cmds[0] {
 		    	"INIT" => {
 			    // Client is asking for the data it needs to set up
-		    	    println!("Got INIT");			    
 			    let return_msg = format!("INIT {}", self.init_for_client());
-	    		    shared::ServerMessage{id: client_id,
-						  text: return_msg }
+		    	    println!("Got INIT\nSEND: {}", return_msg);			    
+	    		    shared::ServerMessage{id: client_id, text: return_msg }
 		    	},
 			"INSTR" => {
 			    // User has selected a instrument
 			    if cmds.len() > 1 {
-				set_instrument(self.settings.get(cmds[1]).unwrap().to_path_buf());
+				self.current_instrument = set_instrument(self.settings.get(cmds[1]).unwrap().to_path_buf());
 			    }
 	    		    shared::ServerMessage{id: client_id,
 						  text: self.current_instrument.clone()}
