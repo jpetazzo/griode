@@ -6,6 +6,7 @@ use chrono::{Local, DateTime};
 const WS_URL: &str = "ws://patchbox.local:9000/ws";
 
 // The selected instrument is either selected or ready
+#[derive(PartialEq)]
 enum SelectedState {
     Initialising,
     Ready,
@@ -219,7 +220,7 @@ fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>
 // ------ ------
 //     View
 // ------ ------
-fn main_div(instrument: String, height:f32) -> Node<Msg> {
+fn main_div(instrument: String, height:f32, selected:bool) -> Node<Msg> {
     log!(format!("{} main_div({})", my_now(), instrument));
 
     // For CSS height is in percent.  
@@ -227,11 +228,17 @@ fn main_div(instrument: String, height:f32) -> Node<Msg> {
 
     // To send on click
     let message = format!("INSTR {}", &instrument);
+    let class = if selected {
+	"selected"
+    }else{
+	"unselected"
+    };
     
     div![
-	// 
+	//
 	attrs![
-	    At::Height => percent(33),		    
+	    At::Height => percent(33),
+	    At::Class => class,
 	],
 	style![
 	    St::Width => "100%",
@@ -277,11 +284,21 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     if model.web_socket.state() == web_socket::State::Open {
 	
 	for i in model.instruments.iter() {
+	    let selected =
+		if model.selected.is_some() &&
+		model.selected.as_ref().unwrap().state ==
+		SelectedState::Ready &&
+		&model.selected.as_ref().unwrap().name == i {
+		    true
+		} else {
+		    false
+		};
 	    log!(format!("{} View: Instrument: {}", my_now(), i));
 	    ret.push(
 		main_div(
 		    i.clone(),
-		    1.0_f32/model.instruments.len() as f32
+		    1.0_f32/model.instruments.len() as f32,
+		    selected,
 		)
 	    );
         }

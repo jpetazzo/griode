@@ -1,3 +1,10 @@
 body,html,#app {
     height: 100%
 }
+.selected {
+    background: aliceblue;
+}
+.unselected {
+    background: #655811;
+}
+
