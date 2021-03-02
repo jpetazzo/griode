@@ -12,8 +12,8 @@ Here are some quick instructions to get you started, assuming that you
 have a LaunchPad connected to an Debian/Ubuntu system.
 
 ```
-git clone git://github.com/worikgh/griode
-cd griode
+git clone git://github.com/worikgh/Musical-Instrument
+cd Musical-Instrument
 sudo apt-get install python3-pip python3-dev libasound2-dev libjack-dev fluidsynth
 pip3 install --user -r requirements.txt
 ( cd soundfonts; ./download-soundfonts.sh; )
@@ -215,6 +215,8 @@ In directory `frontend`
 cargo run --bin server --features server
 
 ### Client
+
+Build with `cargo make watch`
 
 In directory `frontend` run: `simple-http-server``
 
