@@ -1,16 +1,32 @@
 use seed::{prelude::*, *};
 use std::rc::Rc;
-//use  web_sys::HtmlElement;
 mod shared;
-
+//use std::time::SystemTime;
+use chrono::{Local, DateTime};
 const WS_URL: &str = "ws://patchbox.local:9000/ws";
 
-// ------ ------
-//     Model
-// ------ ------
+// The selected instrument is either selected or ready
+enum SelectedState {
+    Initialising,
+    Ready,
+}
+
+// For a selected instrument associate its state
+struct Selected {
+    name:String,
+    state: SelectedState,
+}
 
 pub struct Model {
+
+    // Each instrument is represented by a string
     instruments: Vec<String>,
+
+
+    // There is zero or one selected instrument.  Store it with its
+    // name and state.  If none selected it is None
+    selected:Option<Selected>,
+    
     sent_messages_count: usize,
     messages: Vec<String>,
     input_text: String,
@@ -19,14 +35,18 @@ pub struct Model {
     web_socket_reconnector: Option<StreamHandle>,
 }
 
-// ------ ------
-//     Init
-// ------ ------
+// A little function that outputs the time string for now
+fn my_now() -> String {
+    let dt: DateTime<Local> = Local::now();
+    return dt.to_rfc3339()
+}
 
+// The App init function. 
 fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
-    log!("Init: url: {}", url);
+    log!(my_now(), "Init: url: ", url);
     Model {
 	instruments: Vec::new(), 
+	selected:None,
         sent_messages_count: 0,
         messages: Vec::new(),
         input_text: String::new(),
@@ -36,9 +56,7 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     }
 }
 
-// ------ ------
-//    Update
-// ------ ------
+
 
 pub enum Msg {
     WebSocketOpened,
@@ -58,7 +76,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::WebSocketOpened => {
             model.web_socket_reconnector = None;
-            log!("WebSocket connection is open now");
+            log!(my_now(), "WebSocket connection is open now");
 
 	    // Get the data needed to set up the client
 	    let message_text = "INIT".to_string();
@@ -69,38 +87,46 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.web_socket.send_json(&m).unwrap();
             model.input_text.clear();
             model.sent_messages_count += 1;
-            log!(message_text);
+            log!(my_now(), message_text);
 
         }
+
         Msg::TextMessageReceived(message) => {
-            log!(format!("Client received a text message: {}", message.text));
+            log!( my_now(), "Client received a text message",message.text);
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
 	    match cmds[0] {
 		"INIT" => {
-		    log!(format!("Got INIT"));
+		    log!("Got INIT");
+		    model.instruments.clear();
 		    for i in 1..cmds.len() {
 			log!(format!("Got instrument {}", cmds[i]));
 			model.instruments.push(cmds[i].to_string())
 		    }			
 		},
 		key => {
-		    log!(format!("Got key: '{:?}'", key));
+		    log!(format!("Got key: {}", &key));
+		    model.selected = Some(
+			Selected {
+			    name:key.to_string(),
+			    state: SelectedState::Ready
+			}
+		    );
 		},
 	    }
             model.messages.push(message.text);
-        }
-        Msg::BinaryMessageReceived(message) => {
+	}
+	Msg::BinaryMessageReceived(message) => {
             log!("Client received binary message");
             model.messages.push(message.text);
-        }
-        Msg::CloseWebSocket => {
+	}
+	Msg::CloseWebSocket => {
             model.web_socket_reconnector = None;
             model
-                .web_socket
-                .close(None, Some("user clicked Close button"))
-                .unwrap();
-        }
-        Msg::WebSocketClosed(close_event) => {
+		.web_socket
+		.close(None, Some("user clicked Close button"))
+		.unwrap();
+	}
+	Msg::WebSocketClosed(close_event) => {
             log!("==================");
             log!("WebSocket connection was closed:");
             log!("Clean:", close_event.was_clean());
@@ -110,40 +136,51 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 
             // Chrome doesn't invoke `on_error` when the connection is lost.
             if !close_event.was_clean() && model.web_socket_reconnector.is_none() {
-                model.web_socket_reconnector = Some(
+		model.web_socket_reconnector = Some(
                     orders.stream_with_handle(streams::backoff(None, Msg::ReconnectWebSocket)),
-                );
+		);
             }
-        }
-        Msg::WebSocketFailed => {
+	}
+	Msg::WebSocketFailed => {
             log!("WebSocket failed");
             if model.web_socket_reconnector.is_none() {
-                model.web_socket_reconnector = Some(
+		model.web_socket_reconnector = Some(
                     orders.stream_with_handle(streams::backoff(None, Msg::ReconnectWebSocket)),
-                );
+		);
             }
-        }
-        Msg::ReconnectWebSocket(retries) => {
+	}
+	Msg::ReconnectWebSocket(retries) => {
             log!("Reconnect attempt:", retries);
             model.web_socket = create_websocket(orders);
-        }
-        Msg::InputTextChanged(text) => {
+	}
+	Msg::InputTextChanged(text) => {
             model.input_text = text;
-        }
-        Msg::InputBinaryChanged(text) => {
+	}
+	Msg::InputBinaryChanged(text) => {
             model.input_binary = text;
-        }
-        Msg::SendMessage(msg) => {
+	}
+	Msg::SendMessage(msg) => {
+	    // If `msg` is: "INSTR <instrument>" then we are telling
+	    // the server to select that instrument so that instrument
+	    // gets selected
+	    if msg.text.as_str().starts_with("INSTR ") {
+		model.selected = Some(
+		    Selected {
+			name:msg.text[6..].to_string(),
+			state: SelectedState::Initialising
+		    }
+		);
+	    }
             model.web_socket.send_json(&msg).unwrap();
             model.input_text.clear();
             model.sent_messages_count += 1;
-        }
-        Msg::SendBinaryMessage(msg) => {
+	}
+	Msg::SendBinaryMessage(msg) => {
             let serialized = rmp_serde::to_vec(&msg).unwrap();
             model.web_socket.send_bytes(&serialized).unwrap();
             model.input_binary.clear();
             model.sent_messages_count += 1;
-        }
+	}
     }
 }
 
@@ -183,13 +220,16 @@ fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>
 //     View
 // ------ ------
 fn main_div(instrument: String, height:f32) -> Node<Msg> {
-    log!(format!("main_div({})", instrument));
+    log!(format!("{} main_div({})", my_now(), instrument));
+
+    // For CSS height is in percent.  
     let height_div_percent = (100.0 * height).floor();
 
     // To send on click
     let message = format!("INSTR {}", &instrument);
     
     div![
+	// 
 	attrs![
 	    At::Height => percent(33),		    
 	],
@@ -203,7 +243,13 @@ fn main_div(instrument: String, height:f32) -> Node<Msg> {
         ev(
 	    Ev::Click,
 	    {
-		move |_| Msg::SendMessage(shared::ClientMessage { text: message })
+		log!(my_now(), "Ev::Click Setup", instrument);
+		let instrument_clone = instrument.clone();
+		// Return the closure to execute if there is a click
+		move |_| {
+		    log!(my_now(), "Ev::Click ", instrument_clone);		    
+		    Msg::SendMessage(shared::ClientMessage { text: message })
+		}
             }
 	),
 	span![
@@ -215,16 +261,29 @@ fn main_div(instrument: String, height:f32) -> Node<Msg> {
 	],
     ]
 }
+
 fn view(model: &Model) -> Vec<Node<Msg>> {
-    log!(format!("View.  instruments len: {}", model.instruments.len()));
+    
+    log!(format!("{} View.  instruments len: {}",
+		 my_now(), model.instruments.len()));
+
+
+    // `body` is a convenience function to access the web_sys DOM
+    // body. https://docs.rs/seed/0.8.0/seed/browser/util/fn.body.html
     body().style().set_css_text("height: 100%");
+
     let mut ret:Vec<Node<Msg>> = Vec::new();
 
     if model.web_socket.state() == web_socket::State::Open {
 	
 	for i in model.instruments.iter() {
-	    log!(format!("View: Instrument: {}", i));
-	    ret.push(main_div(i.clone(), 1.0_f32/model.instruments.len() as f32));
+	    log!(format!("{} View: Instrument: {}", my_now(), i));
+	    ret.push(
+		main_div(
+		    i.clone(),
+		    1.0_f32/model.instruments.len() as f32
+		)
+	    );
         }
     } else {
         ret.push(div![p![em!["Connecting or closed"]]]);
