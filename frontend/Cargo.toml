@@ -25,19 +25,28 @@ rmp-serde = "0.14.4"
 web-sys = { version = "0.3", features = ["HtmlElement", "CssStyleDeclaration"] }
 # server
 ws = { version = "0.9.1", optional = true }
+#ws = "0.91"
 
 #client
-seed = "0.8.0" #seed = { version = "0.8.0", optional = true}
+seed = "0.8.0"
+#seed = { version = "0.8.0", optional = true}
+#time = "0.1" # rfc3339
+#chrono = {version = "0.4.19", optional = true}
+#chrono = "0.4.19"
+#features = ["wasmbind"]
+chrono = { version = "0.4.19", features = ["wasmbind"] }
 
 [features]
 # default = []
-# client = ["seed"]
+#client = ["chrono"]
 server = ["ws"]
 CssStyleDeclaration = []
 EventTarget = []
 Node = ["EventTarget"]
 Element = ["EventTarget", "Node"]
 HtmlElement = ["Element", "EventTarget", "Node"]
+#chrono = ["wasmbind"]
+#wasmbind = ["chrono"]
 
 [profile.release]
 lto = true
