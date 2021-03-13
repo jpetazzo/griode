@@ -1,6 +1,6 @@
 #!/bin/perl -w
 use strict;
-chdir "/home/patch/griode/" or die $!;
+chdir "/home/patch/Musical-Instrument/" or die $!;
 
 # mod-host runs lv2 plugins
 my $MOD_HOST='/home/patch/mod-host/bin/mod-host';
@@ -26,10 +26,15 @@ chomp $res;
 $res eq "running" or die "Jack is not running\n";
 
 # Check griode is running
-my $pid = `cat .griode.pid`;
-my $running = grep{/^$pid\s/} `ps x`;
+my $pid_file = ".griode.pid";
+my $running = 0;
+if(-e  $pid_file){
+    my $pid = `cat .griode.pid`;
+    $running = grep{/^$pid\s/} `ps x`;
+}
+
 if(!$running){
-    my $griode_cmd = 'LOG_LEVEL=DEBUG GRIODE_AUDIO_DRIVER=jack' .
+    my $griode_cmd = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
 	'  ./griode.py 2>&1 |tee /tmp/griode.log';
     my $pid = fork();
     defined($pid) or die "$!: Cannot fork";
