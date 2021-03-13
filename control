@@ -57,6 +57,7 @@ sub mod_host( $ ){
 }    
 
 sub write_history( @ ) {
+    # warn "Write history to: $history_fn ";
     open(my $out, ">>$history_fn") or die $!;
     foreach my $l (@_) {
 	print $out "$l\n";
@@ -149,7 +150,7 @@ foreach my $line (@stdin){
 	if($args =~ /^\s*(add)\s+.+$/){
 	    push(@modhost, ["add", $args]);
 	}elsif($args =~ /^\s*param_set\s/){
-	    print "\$args $args\n";
+	    # print "\$args $args\n";
 	    push(@modhost, ["param_set", $args]);
 	}elsif($args =~ /^\s*remove\s/){
 	    push(@modhost, ["remove", $args]);
@@ -170,6 +171,7 @@ foreach my $line (@stdin){
 	    my %modh_hist = ();
 
 	    foreach my $cmd (@history) {
+		# warn "\$cmd $cmd";
 		# jack and mod-host commands are the only ones we need to undo
 		if($cmd =~ /^jack\s(\S+ \S+)\s*$/){
 		    $jack_hist{$1} = $1;
@@ -177,9 +179,9 @@ foreach my $line (@stdin){
 		    $modh_hist{$1} = $1;
 		}	    
 	    }
-	    map {print `jack_disconnect $_`} keys %jack_hist;
-	    map{ print mod_host([["remove", "remove $_"]])} keys %modh_hist;
-	    warn "Deleted history\n";
+	    map {`jack_disconnect $_`} keys %jack_hist;
+	    map{  mod_host([["remove", "remove $_"]])} keys %modh_hist;
+	    # warn "Deleted history\n";
 
 	    unlink $history_fn;
 	}
@@ -189,7 +191,7 @@ foreach my $line (@stdin){
 }
 
 if(@griode){
-    warn "Griode\n";    
+    #warn "Griode commands: ".scalar(@griode)." \n";    
     open(my $out_fh, "|-", "/usr/bin/nc localhost $griode_port")
 	or die $!;
     map {print $out_fh "$_\n"} @griode;
@@ -197,15 +199,15 @@ if(@griode){
     write_history(map{'griode '.$_} @griode);
 }
 if(@modhost){
-    print "mod-host\n";
+    # print "mod-host\n";
     my $start  = time();
     mod_host(\@modhost);
-    print "mod-host: ".(time() - $start) . " seconds\n";
+    # print "mod-host: ".(time() - $start) . " seconds\n";
     write_history(map{'mod-host '. join(' ', @$_)} @modhost);
 }
 if(@jack){
-    warn "jack\n";
-    map{print `jack_connect $_`} @jack;
+    # warn "jack\n";
+    map{`jack_connect $_`} @jack;
     write_history(map{'jack '.$_} @jack);
 }
 
