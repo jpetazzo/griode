@@ -13,6 +13,7 @@ enum SelectedState {
 }
 
 // For a selected instrument associate its state
+#[derive(PartialEq)]
 struct Selected {
     name:String,
     state: SelectedState,
@@ -74,10 +75,11 @@ pub enum Msg {
 }
 
 fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
+    log!(my_now(), format!("update"));
     match msg {
         Msg::WebSocketOpened => {
-            model.web_socket_reconnector = None;
             log!(my_now(), "WebSocket connection is open now");
+            model.web_socket_reconnector = None;
 
 	    // Get the data needed to set up the client
 	    let message_text = "INIT".to_string();
@@ -97,15 +99,15 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
 	    match cmds[0] {
 		"INIT" => {
-		    log!("Got INIT");
+		    log!(my_now(), "Got INIT");
 		    model.instruments.clear();
 		    for i in 1..cmds.len() {
-			log!(format!("Got instrument {}", cmds[i]));
+			log!(my_now(), format!("Got instrument {}", cmds[i]));
 			model.instruments.push(cmds[i].to_string())
 		    }			
 		},
 		key => {
-		    log!(format!("Got key: {}", &key));
+		    log!(my_now(), format!("Got key: {}", &key));
 		    model.selected = Some(
 			Selected {
 			    name:key.to_string(),
@@ -117,10 +119,11 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.messages.push(message.text);
 	}
 	Msg::BinaryMessageReceived(message) => {
-            log!("Client received binary message");
+            log!(my_now(), "Client received binary message");
             model.messages.push(message.text);
 	}
 	Msg::CloseWebSocket => {
+            log!(my_now(), "Client received CloseWebsocket");
             model.web_socket_reconnector = None;
             model
 		.web_socket
@@ -133,7 +136,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             log!("Clean:", close_event.was_clean());
             log!("Code:", close_event.code());
             log!("Reason:", close_event.reason());
-            log!("==================");
+            log!(my_now(), "==================");
 
             // Chrome doesn't invoke `on_error` when the connection is lost.
             if !close_event.was_clean() && model.web_socket_reconnector.is_none() {
@@ -143,7 +146,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
 	}
 	Msg::WebSocketFailed => {
-            log!("WebSocket failed");
+            log!(my_now(), "WebSocket failed");
             if model.web_socket_reconnector.is_none() {
 		model.web_socket_reconnector = Some(
                     orders.stream_with_handle(streams::backoff(None, Msg::ReconnectWebSocket)),
@@ -151,20 +154,24 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             }
 	}
 	Msg::ReconnectWebSocket(retries) => {
-            log!("Reconnect attempt:", retries);
+            log!(my_now(), "Reconnect attempt:", retries);
             model.web_socket = create_websocket(orders);
 	}
 	Msg::InputTextChanged(text) => {
+            log!(my_now(), "Client received InputTextChanged");
             model.input_text = text;
 	}
 	Msg::InputBinaryChanged(text) => {
+            log!(my_now(), "Client received InputBinaryChanged");
             model.input_binary = text;
 	}
 	Msg::SendMessage(msg) => {
 	    // If `msg` is: "INSTR <instrument>" then we are telling
 	    // the server to select that instrument so that instrument
 	    // gets selected
+            log!(my_now(), "Client received msg.text: {}", msg.text);
 	    if msg.text.as_str().starts_with("INSTR ") {
+		log!(my_now(), "msg.text[6..]: {}", msg.text[6..]);
 		model.selected = Some(
 		    Selected {
 			name:msg.text[6..].to_string(),
@@ -220,19 +227,33 @@ fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>
 // ------ ------
 //     View
 // ------ ------
-fn main_div(instrument: String, height:f32, selected:bool) -> Node<Msg> {
-    log!(format!("{} main_div({})", my_now(), instrument));
 
+
+fn main_div(instrument: String,
+	    height:f32, // Proportion of page
+	    selected:&Option<Selected>) -> Node<Msg> {
+
+    // log!(my_now(), format!("{} main_div({})", my_now(), instrument));
+
+    let class = match selected {
+	None =>  "unselected",
+	Some(state) => {
+	    if state.name == instrument {
+		match state.state {
+		    SelectedState::Initialising => "initialising",
+		    SelectedState::Ready => "selected",
+		}
+	    }else{
+		"unselected"
+	    }
+	},
+    };
+    
     // For CSS height is in percent.  
     let height_div_percent = (100.0 * height).floor();
 
     // To send on click
     let message = format!("INSTR {}", &instrument);
-    let class = if selected {
-	"selected"
-    }else{
-	"unselected"
-    };
     
     div![
 	//
@@ -250,7 +271,7 @@ fn main_div(instrument: String, height:f32, selected:bool) -> Node<Msg> {
         ev(
 	    Ev::Click,
 	    {
-		log!(my_now(), "Ev::Click Setup", instrument);
+		// log!(my_now(), my_now(), "Ev::Click Setup", instrument);
 		let instrument_clone = instrument.clone();
 		// Return the closure to execute if there is a click
 		move |_| {
@@ -262,7 +283,9 @@ fn main_div(instrument: String, height:f32, selected:bool) -> Node<Msg> {
 	span![
 	    C!["instrument_name"],
 	    style![
-		St::FontSize => format!("{}vh", height_div_percent),
+		// The whole page is 10em
+		St::FontSize => format!("{}em", (10.0 * height_div_percent) as f64/100.0),
+		St::WordWrap => "break-word".to_string()
 	    ],
 	    format!("{}", &instrument),
 	],
@@ -271,8 +294,8 @@ fn main_div(instrument: String, height:f32, selected:bool) -> Node<Msg> {
 
 fn view(model: &Model) -> Vec<Node<Msg>> {
     
-    log!(format!("{} View.  instruments len: {}",
-		 my_now(), model.instruments.len()));
+    // log!(my_now(), format!("{} View.  instruments len: {}",
+    // 		 my_now(), model.instruments.len()));
 
 
     // `body` is a convenience function to access the web_sys DOM
@@ -284,21 +307,12 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     if model.web_socket.state() == web_socket::State::Open {
 	
 	for i in model.instruments.iter() {
-	    let selected =
-		if model.selected.is_some() &&
-		model.selected.as_ref().unwrap().state ==
-		SelectedState::Ready &&
-		&model.selected.as_ref().unwrap().name == i {
-		    true
-		} else {
-		    false
-		};
-	    log!(format!("{} View: Instrument: {}", my_now(), i));
+	    // log!(format!("{} View: Instrument: {}", my_now(), i));
 	    ret.push(
 		main_div(
 		    i.clone(),
 		    1.0_f32/model.instruments.len() as f32,
-		    selected,
+		    &model.selected,
 		)
 	    );
         }
