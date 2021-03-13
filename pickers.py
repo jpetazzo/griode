@@ -118,7 +118,6 @@ class NotePicker(Gridget):
                         note = padmap[::-1][row-1][column-1]
                     except IndexError:
                         note = None
-                note = note + self.offset
                 self.led2note[led] = note
         self.note2leds.clear()
         for led, note in self.led2note.items():
@@ -180,6 +179,10 @@ class NotePicker(Gridget):
         # FIXME this probably should be moved to the devicechains
         logging.info("Here: {} {} {} Note: {} offset: {}"
                      .format(row, column, velocity, note, self.offset))
+
+        ## Implement shifting keys
+        note += self.offset
+        
         if velocity > 0:
             velocity = 63 + velocity//2
         # Send that note to the message chain
@@ -207,11 +210,11 @@ class NotePicker(Gridget):
                 
             # The pads that play this note    
             leds = self.note2leds[message.note]
-            logging.info("Leds {} "
-                         .format(leds))
+            # logging.info("Leds {} "
+            #              .format(leds))
             for led in leds:
-                logging.info("Led {} Color {} "
-                             .format(led, color))
+                # logging.info("Led {} Color {} "
+                #              .format(led, color))
                 self.surface[led] = color
 
 ##############################################################################
