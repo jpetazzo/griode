@@ -198,20 +198,22 @@ class NotePicker(Gridget):
     def send(self, message, source_object):
         if message.type == "note_on":
 
+            ## `self.offset` is the iplementation of shifting keys
             # User is playing a note            
             if message.velocity == 0:
                 # ??? What does it mean when the velocity is 0?
 
-                color = self.note2color(message.note)
+                color = self.note2color(message.note - self.offset)
             elif source_object == self:
                 color = palette.PLAY[0]
             else:
                 color = palette.PLAY[1]
                 
-            # The pads that play this note    
-            leds = self.note2leds[message.note]
-            # logging.info("Leds {} "
-            #              .format(leds))
+            # The pads that play this note 
+            leds = self.note2leds[message.note - self.offset]
+            # logging.info("Leds {} colour {} source_object/self {} offset {}"
+            #              .format(leds, color, source_object  == self, self.offse
+                                 t))
             for led in leds:
                 # logging.info("Led {} Color {} "
                 #              .format(led, color))
