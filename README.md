@@ -389,3 +389,40 @@ programmes.
 - If a sync is triggered while notes are pressed, it might result
   in zero-length notes.
 
+# Create a Song File
+
+## Set up `griode`
+
+`griode` controls the Launchpad-X and the source sound (via FluidSynth) 
+
+### Select a scale for `griode`
+
+The scale will define which pads are lit up white relative to the root note.
+
+The Major scale is:
+[0,2,4,5,7,9,11]
+
+`griode scale [0, 2, 4, 5, 7, 9, 11]` is the line 
+
+### # Set a root note.  Defined in semi tones away from `A`
+`griode root 3`  Sets root to `C`
+
+### Select a instrument for `griode`
+
+`griode` uses Sound Fonts.
+
+In the log file (and to stdout) at INFO lkog level `griode` dumps all the instruments it knows about.  Like:
+
+```
+[INFO] fluidsynth.py:31 __init__() -> Instrument: font 0 programme: 5 bank 0 name FM Electric Piano
+[INFO] fluidsynth.py:31 __init__() -> Instrument: font 0 programme: 6 bank 0 name Harpsichord
+[INFO] fluidsynth.py:31 __init__() -> Instrument: font 0 programme: 7 bank 0 name Clavinet
+[INFO] fluidsynth.py:31 __init__() -> Instrument: font 0 programme: 8 bank 0 name Celeste
+[INFO] fluidsynth.py:31 __init__() -> Instrument: font 0 programme: 9 bank 0 name Glockenspiel
+```
+
+Use `<font> <programme> <bank> <Name>`  
+
+`griode instrument 0 59 0 Trumpet` sets the instrument to Trumpet
+
+TBC  
