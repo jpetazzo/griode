@@ -4,7 +4,37 @@ body,html,#app {
 .selected {
     background: aliceblue;
 }
+.initialising {
+  animation-name: backgroundColorPalette;
+  animation-duration: 1.5s;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  transition: background-color 1s;
+  background: #7fc19f;
+}
 .unselected {
     background: #655811;
 }
 
+
+/*
+  https://techstacker.com/how-to-loop-background-color-animation-css/
+*/
+/* Standard syntax */
+@keyframes backgroundColorPalette {
+ 0% {
+    background: yellow;
+  }
+  25% {
+    background: red;
+  }
+  50% {
+    background: purple;
+  }
+  75% {
+    background: palegreen;
+  }
+  100% {
+    background: green;
+  }
+}
