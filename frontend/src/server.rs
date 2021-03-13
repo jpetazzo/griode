@@ -51,9 +51,6 @@ impl Server {
 	self.settings = HashMap::new();
 
 	
-	// The names to give instruments.  Limited number that can be
-	// displayed at any time, of course
-	// let name = vec!["A", "B", "C", "D", "E", "F", "G"];
 
 	// Todo Remember this between invocations
 	self.current_instrument = song_names[0].to_string();
@@ -101,6 +98,7 @@ fn set_instrument(p:PathBuf) -> String {
 			    dir_name,
 			    &instrument);
 
+    println!("set_instrument: file_path {}", file_path);
     let exec_name = format!("{}/control", env::current_dir().unwrap()
 	.parent().unwrap().to_str().unwrap());    
     let cmd = format!("{} {}", exec_name, file_path);
@@ -110,7 +108,9 @@ fn set_instrument(p:PathBuf) -> String {
 	.expect("Failed");
     let ecode = child.wait()
                  .expect("failed to wait on child");
-    assert!(ecode.success());
+    let res = ecode.success();
+    println!("set_instrument: res: {}", res);
+    assert!(res);
     println!("set_instrument: {}", cmd);
     instrument
 }
@@ -152,7 +152,14 @@ impl Handler for Server {
 			"INSTR" => {
 			    // User has selected a instrument
 			    if cmds.len() > 1 {
+				println!(
+				    "Calling set_instrument({:?})",
+				    self.settings.get(cmds[1])
+					.unwrap()
+					.to_path_buf()
+				);
 				self.current_instrument = set_instrument(self.settings.get(cmds[1]).unwrap().to_path_buf());
+				println!("Returned from set_instrument");
 			    }
 	    		    shared::ServerMessage{id: client_id,
 						  text: self.current_instrument.clone()}
