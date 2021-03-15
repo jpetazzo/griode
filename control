@@ -23,7 +23,8 @@ my %JACK_PORTS = (
 # and mod-host that have to be undone next run
 my $pwd = `pwd`;
 chomp $pwd;
-my $history_fn = $pwd.'/.history';
+my $history_fn = $0;
+$fistory_
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
