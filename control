@@ -48,9 +48,12 @@ sub mod_host( $ ){
 	    $result .=  $res;
 	    # FIXME  Process $res for errors
 	}
-	$result =~ /resp ([\-0-9]+)/ or warn "ERROR: $cmd_str -- '$result'\n";
-	if($1 < 0){
-	    warn ">> $result";
+	if($result =~ /resp ([\-0-9]+)/){
+	    if($1 < 0){
+		warn ">> $result";
+	    }
+	}else{
+	    warn "ERROR: $cmd_str -- '$result'\n";
 	}
     }
     kill 'HUP' , $pid;
