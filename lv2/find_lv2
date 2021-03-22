@@ -1,0 +1,60 @@
+#!/usr/bin/perl -w
+use warnings;
+use strict;
+
+my @lv2_dirs = map{chomp; $_} `sudo find / -xdev -type d -name "*.lv2"`;
+my %lv2_dirs = (); # Unique directories.  Avoid duplicates
+foreach my $lv2_dir (@lv2_dirs){
+
+    ## Only include directories with at least one *.so file
+    my $a1 =  `find '$lv2_dir' -name "*.so"`;
+    length($a1) == 0 and next;
+
+    $lv2_dir =~ /\/([^\/]+)$/ or die $lv2_dir;
+    my $lv2 = $1; #  Name  of the plugin
+
+    if(defined($lv2_dirs{$lv2})){
+
+	# Decide whether to keep existing directory or to replace it
+
+	# Algorithm 1  If only one has a *.so file choose it
+	my $a2 =  `find  '$lv2_dirs{$lv2}' -name "*.so"`;
+	if(length($a2) == 0 and length($a1) > 0){
+	    $lv2_dirs{$lv2} = $lv2_dir;
+	    next;
+	}elsif(length($a2) > 0 and length($a1) == 0){
+	    # Happy with what we have
+	    next;
+	}
+
+	# Both directories have a *.so file.  Choose the directory
+	# where the oldest *.so file is the newest
+	my %times1 = map{chomp ; $_ => -C $_ } split(/\n/, $a1);
+	my %times2 = map{chomp ; $_ => -C $_ } split(/\n/, $a2);
+
+	my @vtimes1 = values(%times1);
+	my $min1 = shift @vtimes1;
+	map{$_ < $min1 and $min1 = $_} @vtimes1;
+	my @vtimes2 = values(%times2);
+	my $min2 = shift @vtimes2;
+	map{$_ < $min2 and $min2 = $_} @vtimes2;
+
+	if($min1 < $min2){
+	    $lv2_dirs{$lv2} = $lv2_dir;
+	    next;
+	}elsif($min1 > $min2){
+	    next;
+	}
+
+	# Default towards the most recent if it is a duplicate
+	$lv2_dirs{$lv2} = $lv2_dir;
+    }else{
+	$lv2_dirs{$lv2} = $lv2_dir;
+    }
+}
+
+# Make the links
+foreach my $lv2 (keys %lv2_dirs){
+    my $ln = "ln -s '$lv2_dirs{$lv2}' 'plugins/$lv2'";
+    print `$ln`;
+}
