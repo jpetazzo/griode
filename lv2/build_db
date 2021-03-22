@@ -9,10 +9,13 @@ open(my $out, ">$db_filename") or die "$!: $db_filename";
 print $out "[\n";
 
 ## Load all LV2 plugins installed
-my @lv2_urls = map {chomp; $_} `LV2_PATH=/usr/local/lib/lv2/:/usr/lib/lv2/ lv2ls`;
+my $path = $0;
+$path =~ s/\/[^\/]+$//;
+$path .= "/plugins";
+my @lv2_urls = map {chomp; $_} `LV2_PATH=$path lv2ls`;
 
 foreach my $url (@lv2_urls){
-    my @info = `lv2info $url`;
+    my @info = `LV2_PATH=$path lv2info $url`;
     my $name;
     my $class;
     my $state = "start";
@@ -92,12 +95,18 @@ foreach my $url (@lv2_urls){
     if(!defined($name)){
 	# Deduce name from URL
 	warn "No name for $url\n";
-	$url =~ /([a-z_\%0-9]+)/ or die $url;
+	$url =~ /\/([^\/]+)$/ or die $url;
 	$name = $1;
     }
     unless(defined($name) and
 	   defined($class)){
-	die $url;
+	print "$url\n";
+	print "name: ";
+	print defined($name) ? $name : "<undef>";
+	print "\nclass: ";
+	print defined($class) ? $class : "<undef>";
+	print "\n";
+	next;	
     }
     foreach my $n (keys %port_data){
 	defined $port_data{$n}->{Name} or
