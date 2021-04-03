@@ -1,5 +1,6 @@
-use ws::{listen, CloseCode, Handler, Message, Request, Response,
-	 Result, ErrorKind, Error, Sender};
+// use ws::{listen, CloseCode, Handler, Message, Request, Response,
+// 	 Result, ErrorKind, Error, Sender};
+use ws;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process::Command;
@@ -14,7 +15,7 @@ mod shared;
 
 
 struct Server {
-    out: Sender,
+    out: ws::Sender,
     settings: HashMap<String, PathBuf>,
     current_instrument: String,
 }
@@ -114,11 +115,11 @@ fn set_instrument(p:PathBuf) -> String {
     println!("set_instrument: {}", cmd);
     instrument
 }
-impl Handler for Server {
-    fn on_request(&mut self, req: &Request) -> Result<Response> {
+impl ws::Handler for Server {
+    fn on_request(&mut self, req: &ws::Request) -> ws::Result<ws::Response> {
         match req.resource() {
-            "/ws" => Response::from_request(req),
-            _ => Ok(Response::new(
+            "/ws" => ws::Response::from_request(req),
+            _ => Ok(ws::Response::new(
                 200,
                 "OK",
                 b"Websocket server is running".to_vec(),
@@ -127,16 +128,16 @@ impl Handler for Server {
     }
 
     // Handle messages recieved in the websocket (in this case, only on `/ws`).
-    fn on_message(&mut self, msg: Message) -> Result<()> {
+    fn on_message(&mut self, msg: ws::Message) -> ws::Result<()> {
         let client_id: usize = self.out.token().into();
         if !msg.is_text() {
-	    Err(Error::new(
-		ErrorKind::Internal,
+	    Err(ws::Error::new(
+		ws::ErrorKind::Internal,
 		"Unknown message type"))
 	}else{
 	    // `msg` is type: `ws::Message::Text(String)` The
 	    // contained string is JSON shared::ServerMessage
-	    if let Message::Text(client_msg)  = msg {
+	    if let ws::Message::Text(client_msg)  = msg {
 		println!("client_msg: {}", client_msg);
 		let m:shared::ClientMessage =
 		    serde_json::from_str(client_msg.as_str()).unwrap();
@@ -179,7 +180,7 @@ impl Handler for Server {
 	}
     }
 
-    fn on_close(&mut self, code: CloseCode, reason: &str) {
+    fn on_close(&mut self, code: ws::CloseCode, reason: &str) {
         let client_id: usize = self.out.token().into();
         let code_number: u16 = code.into();
         println!(
@@ -191,34 +192,17 @@ impl Handler for Server {
 }
 
 fn send_message(server_msg: shared::ServerMessage,
-		out: &Sender) -> Result<()>{
-    let server_msg : Message = serde_json::to_string(&server_msg)
+		out: &ws::Sender) -> ws::Result<()>{
+    let server_msg : ws::Message = serde_json::to_string(&server_msg)
 	.unwrap()
 	.into();
     out.broadcast(server_msg)
 }    
 
-// fn handle_text_message(client_id: usize, msg: Message) -> Message {
-//     let client_msg: shared::ClientMessage =
-//         serde_json::from_str(&msg.into_text().unwrap()).unwrap();
-
-//     println!( "> text: '{}'", client_msg.text );
-
-//     let server_msg: Message = serde_json::to_string(&shared::ServerMessage {
-//         id: client_id,
-//         text: client_msg.text,
-//     })
-//     .unwrap()
-//     .into();
-
-//     server_msg
-// }
-
-
 fn main() {
     // Listen on an address and call the closure for each connection
     println!("Starting server");
-    listen("0.0.0.0:9000", |out| Server { out:out,
+    ws::listen("0.0.0.0:9000", |out| Server { out:out,
 					  current_instrument: String::new(),
 					  settings:HashMap::new() }).unwrap()
 }
