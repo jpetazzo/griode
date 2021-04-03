@@ -1,0 +1,47 @@
+clear
+
+griode scale [0, 3, 5, 7, 10]
+
+# Root is E
+griode root 1
+
+griode instrument 0 5 11 Piano & FM EP
+# griode instrument 0 59 0 Trumpet
+griode draw
+
+mh add http://avwlv2.sourceforge.net/plugins/avw/amp 1
+mh param_set 1 gain 10.0
+
+mh add http://drobilla.net/plugins/mda/Leslie 2
+# mh param_set 2
+mh param_set 2 speed .5
+
+mh add http://drobilla.net/plugins/mda/Combo 3
+mh param_set 3 model 0.8333333333
+mh param_set 3 drive .5
+mh param_set 3 output .5
+
+# mh add http://guitarix.sourceforge.net/plugins/gx_fumaster_#_fumaster_ 4
+# mh param_set 4 VOLUME 1
+# mh param_set 4 WET_DRY 0
+mh add http://guitarix.sourceforge.net/plugins/gx_aclipper_#_aclipper_ 4
+mh param_set 4 DRIVE 1
+
+# Effects for guitar/voice
+jack system:capture_1  effect_4:in
+jack effect_4:out system:playback_1
+jack effect_4:out system:playback_2
+
+
+jack fluidsynth:left effect_1:input
+jack fluidsynth:right effect_1:input
+jack effect_1:output effect_2:left_in
+jack effect_1:output effect_2:right_in
+jack effect_2:left_out effect_3:left_in
+jack effect_2:right_out effect_3:right_in
+jack effect_3:right_out system:playback_1
+jack effect_3:left_out system:playback_2
+# jack fluidsynth:left system:playback_1
+# jack fluidsynth:right system:playback_2
+
+

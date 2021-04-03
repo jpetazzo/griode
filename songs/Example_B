@@ -1,0 +1,29 @@
+clear
+
+griode scale [0, 3, 5, 7, 10]
+
+# Root is E
+griode root 0
+
+griode instrument 0 27 12 Clean Guitar 2
+griode draw
+
+mh add http://guitarix.sourceforge.net/plugins/gx_jcm800pre_st#_jcm800pre_st 1
+mh param_set 1 GAIN -10.289855
+# mh param_set 1 P6v 0.2753625
+# mh param_set 1 WET_DRY 100
+# mh param_set 1 Treble 1
+# mh param_set 1 Middle 1
+
+jack fluidsynth:left effect_1:in
+jack fluidsynth:right effect_1:in1
+# jack effect_1:output effect_2:left_in
+# jack effect_1:output effect_2:right_in
+# jack effect_2:left_out effect_3:left_in
+# jack effect_2:right_out effect_3:right_in
+# jack effect_3:right_out system:playback_1
+# jack effect_3:left_out system:playback_2
+jack effect_1:out system:playback_1
+jack effect_1:out1 system:playback_2
+
+
