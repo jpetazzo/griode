@@ -1,0 +1,55 @@
+clear
+
+griode scale [0, 3, 5, 7, 10]
+
+# Root is E
+griode root 7 
+
+griode instrument 0 14 8 Bells
+griode draw
+
+
+mh add http://avwlv2.sourceforge.net/plugins/avw/amp 1
+mh param_set 1 gain 0.8
+
+
+# mh add http://plugin.org.uk/swh-plugins/pitchScaleHQ 2
+
+mh add http://guitarix.sourceforge.net/plugins/gx_detune_#_detune_ 2
+# mh param_set 2
+mh param_set 2 LATENCY 2.0
+mh param_set 2 WET 2.0
+mh param_set 2 DRY 100.0
+mh param_set 2 COMPENSATE 1.0
+mh param_set 2 OCTAVE 1.0
+mh param_set 2 DETUNE 12.0
+
+
+mh add http://guitarix.sourceforge.net/plugins/gx_mbreverb_#_mbreverb_ 3
+# mh param_set 3 
+mh param_set 3 ROOMSIZE1 1.0
+mh param_set 3 ROOMSIZE2 1.0
+mh param_set 3 ROOMSIZE3 1.0
+mh param_set 3 ROOMSIZE4 1.0
+mh param_set 3 ROOMSIZE5 1.0
+
+mh add http://drobilla.net/plugins/mda/Leslie 4
+# mh param_set 4
+mh param_set 4 speed .1
+
+# jack effect_1:output effect_2:input
+# jack effect_1:output MI_OUT1
+# jack effect_1:output MI_OUT2
+# jack fluidsynth:left effect_1:input
+# jack fluidsynth:right effect_1:input
+
+jack fluidsynth:left effect_1:input
+jack fluidsynth:right effect_1:input
+jack effect_1:output effect_2:in
+jack effect_2:out effect_3:in
+jack effect_3:out effect_4:left_in
+jack effect_3:out effect_4:right_in
+jack effect_4:left_out MI_OUT1
+jack effect_4:right_out MI_OUT2
+
+

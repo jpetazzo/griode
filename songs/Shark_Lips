@@ -1,0 +1,37 @@
+clear
+griode scale [0, 3, 6, 7, 10]
+griode instrument 1 0 1126 Chords
+griode draw
+
+# Root is A
+griode root 12
+
+mh add http://invadarecords.com/plugins/lv2/tube/mono 1
+# 0 <= drive <= 18
+mh param_set 1 drive 1.9
+mh param_set 1 dcoffset -0.9600000
+mh param_set 1 mix 93
+
+
+mh add http://invadarecords.com/plugins/lv2/compressor/mono 2
+# Gain -6 <= gain <= 36
+mh param_set 2 gain 0
+
+mh add http://guitarix.sourceforge.net/plugins/gxechocat#echocat 3
+mh param_set 3 drive 0.5
+
+# min/max 0/1  Amount of signal in echo
+mh param_set 3 swell 1
+
+mh param_set 3 sustain 0.5
+mh param_set 3 bpm 240
+mh param_set 3 head1 .1
+mh param_set 3 head2 0.05
+mh param_set 3 head3 0.025
+
+jack effect_1:out effect_2:in
+jack effect_2:out effect_3:in
+jack effect_3:out MI_OUT1
+jack effect_3:out MI_OUT2
+jack fluidsynth:left effect_1:in
+jack fluidsynth:right effect_1:in
