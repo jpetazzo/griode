@@ -34,6 +34,8 @@ class Clock(object):
 
         self.command_port = 8887
 
+        logging.info("Opening command socket on port {}".
+                     format(self.command_port))
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(("127.0.0.1", self.command_port))
         self.server_socket.listen(1)
