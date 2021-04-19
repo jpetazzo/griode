@@ -177,8 +177,8 @@ class NotePicker(Gridget):
             return
         # Velocity curve (this is kind of a hack for now)
         # FIXME this probably should be moved to the devicechains
-        logging.info("Here: {} {} {} Note: {} offset: {}"
-                     .format(row, column, velocity, note, self.offset))
+        # logging.info("Here: {} {} {} Note: {} offset: {}"
+        #              .format(row, column, velocity, note, self.offset))
 
         ## Implement shifting keys
         note += self.offset
@@ -212,8 +212,7 @@ class NotePicker(Gridget):
             # The pads that play this note 
             leds = self.note2leds[message.note - self.offset]
             # logging.info("Leds {} colour {} source_object/self {} offset {}"
-            #              .format(leds, color, source_object  == self, self.offse
-                                 t))
+            #              .format(leds, color, source_object  == self, self.offset))
             for led in leds:
                 # logging.info("Led {} Color {} "
                 #              .format(led, color))

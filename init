@@ -1,22 +1,36 @@
 #!/bin/perl -w
 use strict;
-chdir "/home/patch/Musical-Instrument/" or die $!;
+my $ROOT =  "/home/patch/Musical-Instrument";
+
+my $GRIODE_PID_FILE = "$ROOT/.griode.pid";
+my $FE_PID_FILE = "$ROOT/.griode.pid";
+my $WS_PID_FILE = "$ROOT/.griode.pid";
+my $LV2_PATH = "$ROOT/lv2/plugins";
+
+my $GRIODE_CMD = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
+    " $ROOT/griode.py 2>&1 |tee /tmp/griode.log";
+
 
 # mod-host runs lv2 plugins
 my $MOD_HOST='/home/patch/mod-host/bin/mod-host';
 -e $MOD_HOST or die $!;
 
-# Check if mod-host is running
+# Check if mod-host is running if not run it
 my @psx = `ps x`;
 my  $mod_host_running = grep{/mod-host/} @psx;
 if(!$mod_host_running){
     # Need to start mod-host
-    my $p = fork();
 
+    my $cmd = "LV2_PATH=$LV2_PATH $MOD_HOST";
+    print "Run: $cmd\n";
+
+    my $p = fork();
     if($p == 0) {
 	# Child
-	`$MOD_HOST`;
+	`$cmd`;
 	exit;
+    }else{
+	print "Forked mod-host\n";
     }
 }
 
@@ -26,27 +40,70 @@ chomp $res;
 $res eq "running" or die "Jack is not running\n";
 
 # Check griode is running
-my $pid_file = ".griode.pid";
 my $running = 0;
-if(-e  $pid_file){
-    my $pid = `cat .griode.pid`;
+if(-e  $GRIODE_PID_FILE){
+    my $pid = `cat $GRIODE_PID_FILE`;
     $running = grep{/^$pid\s/} `ps x`;
 }
 
 if(!$running){
-    my $griode_cmd = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
-	'  ./griode.py 2>&1 |tee /tmp/griode.log';
     my $pid = fork();
     defined($pid) or die "$!: Cannot fork";
     if($pid == 0){
 	# Child
-	exec "$griode_cmd" or die "$!: Could not exec";
+	exec "$GRIODE_CMD" or die "$!: Could not exec";
+    }else{
+	print "Ran $GRIODE_CMD\n";
     }
 }
 
+sub run_fe {
+
+    # Run the front end.  A web app using websockets.  SO need http
+    # server and web socket server
+    
+    my $ws_server = "cargo run --bin server --features server   ";
+    my $fe_server = "simple-http-server";
+
+    my $pid = `cat $FE_PID_FILE`;
+    chomp $pid;
+    unless($pid  &&
+	   `ps x | grep $pid | grep -v grep`){
+	# Front end has not started
+	my $fe_pid = fork();
+	if($fe_pid == 0) {
+	    # child
+	    chdir 'frontend' ;
+	    exec $ws_server or die "$!: Cannot exec $ws_server";
+	}else{
+	    `echo $fe_pid > $FE_PID_FILE`;
+	}
+    }
+
+    $pid = `cat $WS_PID_FILE`;
+    chomp $pid;
+    unless($pid &&
+	   `ps x | grep $pid | grep -v grep`){
+	# Web socket server has has not started
+	my $ws_pid = fork();
+	if($ws_pid == 0) {
+	    # child
+	    chdir "frontend";
+	    exec $ws_server or die "$!: Could not exec: $ws_server";
+	    exit;
+	}else{
+	    `echo $ws_pid > $WS_PID_FILE`;
+	}
+    }
+}
+
+&run_fe;
 wait;
 
 # Clean up
 #unlink($cmdPipe);
+
+
+
 
 

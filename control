@@ -20,28 +20,40 @@ my %JACK_PORTS = (
     );
 
 # The history file keeps track of what changes this has made to jack
-# and mod-host that have to be undone next run
+# and mod-host that have to be undone next run.  FIXME The history
+# file is in a bad place.  Should not be able to write to the
+# directory the script is in
 my $pwd = `pwd`;
 chomp $pwd;
-my $history_fn = $0;
-$fistory_
+my $DIR = $0;
+$DIR =~ s/\/[^\/]+$/\//;
+my $history_fn = "$DIR.history";
+warn "History is: $history_fn";
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
 
+sub meter_bridge {
+    my $pid_fn = "$DIR.meter_bridge.pid";
+    if(-e $pid_fn){
+	my $pid = `cat $pid_fn`;
+	chomp $pid;
+	kill 'HUP' , $pid;
+    }
+    
+}
 
 sub mod_host( $ ){
     my $cmds = shift or die;
     my @cmds = @$cmds;
 
     my $pid =
-	open2(my $child_out, my $child_in, "/usr/bin/nc localhost $mod_host_port");
+	open2(my $child_out, my $child_in,
+	      "/usr/bin/nc localhost $mod_host_port");
     defined $pid or die "$!: Fork failed";
 
     foreach my $cmd (@cmds){
-	my $cmd_str = "$cmd->[1]";
-	print "mod-host: $cmd_str\n";
-	print $child_in "$cmd_str\n";
+	print $child_in "$cmd\n";
 
 	my $result = '';
 	while(1){
@@ -55,14 +67,13 @@ sub mod_host( $ ){
 		last;
 	    }
 	    $result .=  $res;
-	    # FIXME  Process $res for errors
 	}
 	if($result =~ /resp ([\-0-9]+)/){
 	    if($1 < 0){
-		warn ">> $result";
+		warn ">> $cmd >>  $result";
 	    }
 	}else{
-	    warn "ERROR: $cmd_str -- '$result'\n";
+	    warn "ERROR: $cmd -- '$result'\n";
 	}
     }
     kill 'HUP' , $pid;
@@ -159,13 +170,10 @@ foreach my $line (@stdin){
     }elsif($arg1 eq 'mh'){
 	# Could be a `add` instruction to create a mod-host efect or
 	# `param_set` to set parameters
-	if($args =~ /^\s*(add)\s+.+$/){
-	    push(@modhost, ["add", $args]);
-	}elsif($args =~ /^\s*param_set\s/){
-	    # print "\$args $args\n";
-	    push(@modhost, ["param_set", $args]);
-	}elsif($args =~ /^\s*remove\s/){
-	    push(@modhost, ["remove", $args]);
+	if($args =~ /^\s*(add)\s+.+$/ ||
+	   $args =~ /^\s*param_set\s/ ||
+	   $args =~ /^\s*remove\s/){
+	    push(@modhost,  $args);
 	}
     }elsif($arg1 eq 'jack'){
 	push(@jack, $args);
@@ -215,19 +223,16 @@ if(@modhost){
     my $start  = time();
     mod_host(\@modhost);
     # print "mod-host: ".(time() - $start) . " seconds\n";
-    write_history(map{'mod-host '. join(' ', @$_)} @modhost);
+    write_history(map{'mod-host '. $_} @modhost);
 }
 if(@jack){
     # warn "jack\n";
     foreach my $cmd (@jack){
 	foreach my $lhs (keys %JACK_PORTS){
-	    print "$cmd In\n";
 	    my $rhs = $JACK_PORTS{$lhs};
-	    print "$lhs -> $rhs\n";
 	    $cmd =~ s/$lhs/$rhs/g;
 	}
 	`jack_connect $cmd`;
-	print "$cmd out\n";
 	write_history(('jack '.$cmd));
     }
 }

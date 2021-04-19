@@ -8,19 +8,29 @@ my $db_filename = "lv2.json";
 open(my $out, ">$db_filename") or die "$!: $db_filename";
 print $out "[\n";
 
-## Load all LV2 plugins installed
+## Load all LV2 plugins installed.  `find_lv2` searches the computer
+## file system for LV2 directories and puts links to them all in
+## lv2/plugins
 my $path = $0;
 $path =~ s/\/[^\/]+$//;
 $path .= "/plugins";
+
+# Lists all the plugins on the path:  LV2_PATH
 my @lv2_urls = map {chomp; $_} `LV2_PATH=$path lv2ls`;
 
 foreach my $url (@lv2_urls){
+
+    # For each discovered URL use `lvinfo` to get all the information about each plugin
     my @info = `LV2_PATH=$path lv2info $url`;
+
     my $name;
     my $class;
+
     my $state = "start";
+
     my %port_data = ();
     my $port;
+
     foreach my $l (@info){
 
 	chomp $l;
@@ -29,6 +39,7 @@ foreach my $url (@lv2_urls){
 	    $l eq $url or die "$l ne $url";
 	    next;
 	}
+
 	if($state eq 'start' and $l =~ /^\s+UIs:\s*$/){
 	    $state = 'UI';
 	    next;
@@ -45,7 +56,7 @@ foreach my $url (@lv2_urls){
 	    next;
 	}elsif($state eq "start" and $l =~ /^\s+Class:\s+(.+)\s*$/){
 	    # Getting the class of a plugin is fraught.  About half
-	    # doe not have a useful class,
+	    # do not have a useful class,
 	    my $c = $1;
 	    if($c =~ /plug.in/){
 		# Generic class with no information
@@ -70,7 +81,7 @@ foreach my $url (@lv2_urls){
 	    }elsif($l =~ /^\s+Name:\s+(.+)\s*$/){
 		$port_data{$port}->{Name} = $1;
 		next;
-	    }elsif($state eq 'port' and $l =~ /^\s+Scale Points:\s*$/){
+	    }elsif($l =~ /^\s+Scale Points:\s*$/){
 		$state = 'scale points';
 		$port_data{$port}->{scale_points} = {};
 		next;

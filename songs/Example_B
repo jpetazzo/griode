@@ -21,9 +21,9 @@ jack fluidsynth:right effect_1:in1
 # jack effect_1:output effect_2:right_in
 # jack effect_2:left_out effect_3:left_in
 # jack effect_2:right_out effect_3:right_in
-# jack effect_3:right_out system:playback_1
-# jack effect_3:left_out system:playback_2
-jack effect_1:out system:playback_1
-jack effect_1:out1 system:playback_2
+# jack effect_3:right_out MI_OUT1
+# jack effect_3:left_out MI_OUT2
+jack effect_1:out MI_OUT1
+jack effect_1:out1 MI_OUT2
 
 
