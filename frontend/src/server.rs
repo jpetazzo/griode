@@ -42,10 +42,22 @@ struct ServerState {
     // name "songs" is terrible)
     instrument: String,
 
-    // `instrument` is a reference to one of these strings
-    instruments:Vec<String>,
+    // Map a instrument name to the path tp the file that describes
+    // it.  When `control` is used this is the file name passed as
+    // argument.  Stored as String not PathBuf because it is not
+    // opened in Rust
+    instruments:HashMap<String, String>,
+}
 
-    settings: HashMap<String, PathBuf>,
+impl ServerState {
+
+    fn new() -> Self {
+	let (a, b) = load_instruments();
+	Self{
+	    instruments:b,
+	    instrument:a,
+	}
+    }  
 }
 
 struct MyFactoryServer{
@@ -69,76 +81,7 @@ struct MyHandlerServer{
 
 impl MyHandlerServer {
     fn init_for_client(&mut self) -> String {
-
-	// Find the direcory with the instrument data in it.
-	let current_dir = env::current_dir().unwrap();
-	let dir = current_dir.parent().unwrap();
-	let dir_name = dir.to_str().unwrap().to_string() + "/songs";
-	let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
-
-	let mut list_d = String::new();
-	info!("list_name: {}", list_name);
-
-	File::open(list_name.as_str()).unwrap()
-	    .read_to_string(&mut list_d).unwrap();
-
-	let  song_names:Vec<&str> =
-	    list_d.as_str().lines().filter(
-
-		|x| x
-		    .split_whitespace()
-		    .next().unwrap_or("#")
-		    .bytes().next()
-		    .unwrap() != b'#'
-	    ).collect();
-	
-	info!("Songs: {}",
-	      song_names.iter().fold(String::new(),
-				     |a, b| format!("{} {}", a, b)));
-
-	if song_names.len() == 0 {
-	    panic!("No songs in list");
-	}
-	
-	let dir = PathBuf::from(dir_name.as_str());
-	if !dir.is_dir() {
-	    panic!("{} is not a directory!", dir.to_str().unwrap());
-	}
-	self.server_state.lock().unwrap().settings = HashMap::new();
-
-	// Todo Remember this between invocations
-	self.server_state.lock().unwrap().instrument
-	    = String::from(song_names[0]);
-
-	for entry in dir.read_dir().expect("read_dir call failed") {
-	    if let Ok(entry) = entry {
-		// entry is std::fs::DirEntry
-		let p = entry.path();
-		if p.as_path().is_file() &&
-		    p.as_path().extension().is_none() {
-			// Files with no extension are descriptions of
-			// settings for the instrument
-			let song_name =
-			    p.file_name().unwrap()
-			    .to_str().unwrap()
-			    .to_string();
-			info!("Song name: {} ", song_name);
-			if song_names.contains(&song_name.as_ref()) {
-			    info!("In");
-			    self.server_state.lock().unwrap()
-				.settings.insert(song_name.clone(),
-						 PathBuf::from(song_name));
-			}else{
-			    info!("Out");
-			}			    
-		    }
-	    }	
-	}
-
-	self.server_state.lock().unwrap()
-	    .settings.iter().fold(
-	    String::new(), |a, b| a + " " + b.0.as_str()
-	)
+	"".to_string()
     }
     fn new(
 	out:ws::Sender,
@@ -183,11 +126,7 @@ impl MyFactoryServer {
     fn new() -> Self {
 	let ret = Self {
 	    txs:Arc::new(Mutex::new(Vec::new())),
-	    server_state:Arc::new(Mutex::new(ServerState{
-		instruments:Vec::new(),
-		instrument:String::new(),
-		settings:HashMap::new(),
-	    })),
+	    server_state:Arc::new(Mutex::new(ServerState::new())),
 	};
 	ret
     }
@@ -278,20 +217,26 @@ impl ws::Handler for MyHandlerServer {
 		    	},
 
 			"INSTR" => {
+			    // INSTR <instrument name>
 			    // User has selected a instrument
+			    
 			    if cmds.len() > 1 {
+				let instrument_name = cmds[1];
+				let mut server_state =
+				    self.server_state.lock().unwrap();
+
 				info!(
 				    "Calling set_instrument({:?})",
-				    self.server_state.lock().unwrap()
-					.settings.get(cmds[1])
+				    server_state.instruments.get(instrument_name)
 					.unwrap()
-					.to_path_buf()
 				);
-				self.server_state.lock().unwrap().instrument =
-				    set_instrument(
-					self.server_state.lock().unwrap()
-					    .settings.get(cmds[1]).unwrap().
-					    to_path_buf());
+				set_instrument(
+				    self.server_state.lock().unwrap()
+					.instruments.get(instrument_name).unwrap()
+				);
+				server_state.instrument =
+				    instrument_name.to_string();
+				    
 				info!("Returned from set_instrument");
 			    }
 	    		    shared::ServerMessage{
@@ -331,21 +276,19 @@ fn get_dir() -> String {
     dir.to_str().unwrap().to_string() + "/songs"
 }
 
-fn set_instrument(p:PathBuf) -> String {
+fn set_instrument(file_path:&str) {
 
-    let dir_name = get_dir();
-    let instrument = p.as_os_str().to_str().unwrap().to_string();
-    let file_path = format!("{}/{}",
-			    dir_name,
-			    &instrument);
 
     info!("set_instrument: file_path {}", file_path);
 
-    let exec_name = format!("{}/control", env::current_dir().unwrap()
-	.parent().unwrap().to_str().unwrap());    
+    let exec_name = format!(
+	"{}/control",
+	env::current_dir().unwrap().parent().unwrap().to_str().unwrap()
+    );    
+
     let cmd = format!("{} {}", exec_name, file_path);
     let mut child = Command::new(exec_name.as_str())
-	.arg(file_path.as_str())
+	.arg(file_path)
 	.spawn()
 	.expect("Failed");
     let ecode = child.wait()
@@ -354,7 +297,6 @@ fn set_instrument(p:PathBuf) -> String {
     info!("set_instrument: res: {}", res);
     assert!(res);
     info!("set_instrument: {}", cmd);
-    instrument
 }
 
 fn send_message(server_msg: shared::ServerMessage,
@@ -365,6 +307,78 @@ fn send_message(server_msg: shared::ServerMessage,
     out.broadcast(server_msg)
 }    
 
+
+
+
+fn load_instruments() -> (String, HashMap<String, String>) {
+
+    // Find the direcory with the instrument data in it.
+    let current_dir = env::current_dir().unwrap();
+    let dir = current_dir.parent().unwrap();
+    let dir_name = dir.to_str().unwrap().to_string() + "/songs";
+
+    // Get the list of instruments that are used. There can be more
+    // instruments in the directpry than are used.
+    let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
+    info!("list_name: {}", list_name);
+
+    let mut list_d = String::new();
+
+    File::open(list_name.as_str()).unwrap()
+	.read_to_string(&mut list_d).unwrap();
+
+    // The names of the songs to use
+    let  song_names:Vec<&str> =
+	list_d.as_str().lines().filter(
+
+	    |x| x
+		.split_whitespace()
+		.next().unwrap_or("#")
+		.bytes().next()
+		.unwrap() != b'#'
+	).collect();
+    
+    if song_names.len() == 0 {
+	panic!("No songs in list");
+    }
+    
+    info!("Songs: {}",
+	  song_names.iter().fold(String::new(),
+				 |a, b| format!("{} {}", a, b)));
+
+    let dir = PathBuf::from(dir_name.as_str());
+    if !dir.is_dir() {
+	panic!("{} is not a directory!", dir.to_str().unwrap());
+    }
+
+    // Todo Remember this between invocations
+    let ret0 = String::from(song_names[0]);
+    let mut ret1 = HashMap::new();
+
+    for entry in dir.read_dir().expect("read_dir call failed") {
+	if let Ok(entry) = entry {
+	    // entry is std::fs::DirEntry
+	    let p = entry.path();
+	    if p.as_path().is_file() &&
+		p.as_path().extension().is_none() {
+
+		    // Files with no extension are descriptions of
+		    // settings for the instrument
+		    let song_name =
+			p.file_name().unwrap()
+			.to_str().unwrap()
+			.to_string();
+		    
+		    if song_names.contains(&song_name.as_ref()) {
+			ret1.insert(song_name.clone(),
+				    p.to_str().unwrap().to_string());
+		    }else{
+		    }			    
+		}
+	}	
+    }
+    (ret0, ret1)
+}
 
 fn main() -> std::io::Result<()>{
     // Listen on an address and call the closure for each connection
