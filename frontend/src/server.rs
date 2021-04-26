@@ -24,6 +24,11 @@ mod shared;
 // Websocket server code starts
 #[derive(Copy, Clone, Debug)]
 struct State {
+
+    // `state` is to be set by a pedal.  The pedal available has three
+    // pedals, that ioperate via USB port and look like a keyboard
+    // with three keys: 'a', 'b', 'c'.  Changnig `state` will change
+    // the LV2 effects loaded into the signal path.
     state:char
 }
 
@@ -32,25 +37,185 @@ struct State {
 /// initialise clients and respond to the client requests.
 #[derive(Clone, Debug)]
 struct ServerState {
-    things:Vec<String>,
-    thing:String,
+
+    // Each instrument is a file in the directory "songs" (FIXME: The
+    // name "songs" is terrible)
+    instrument: String,
+
+    // `instrument` is a reference to one of these strings
+    instruments:Vec<String>,
+
+    settings: HashMap<String, PathBuf>,
 }
 
 struct MyFactoryServer{
     
-    // A transmitter for each `Handle`
+    // A transmitter for each `Handle` so changes in state can be
+    // propagated
     txs:Arc<Mutex<Vec<mpsc::Sender<State>>>>,
-    
+
+    // The state of the server.  It is shared state 
     server_state:Arc<Mutex<ServerState>>,
 
 }
 
 struct MyHandlerServer{
     out:ws::Sender,
-    settings: HashMap<String, PathBuf>,
 
+    // Local copy of state
     server_state:Arc<Mutex<ServerState>>,
 
+}
+
+impl MyHandlerServer {
+    fn init_for_client(&mut self) -> String {
+
+	// Find the direcory with the instrument data in it.
+	let current_dir = env::current_dir().unwrap();
+	let dir = current_dir.parent().unwrap();
+	let dir_name = dir.to_str().unwrap().to_string() + "/songs";
+	let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
+
+	let mut list_d = String::new();
+	info!("list_name: {}", list_name);
+
+	File::open(list_name.as_str()).unwrap()
+	    .read_to_string(&mut list_d).unwrap();
+
+	let  song_names:Vec<&str> =
+	    list_d.as_str().lines().filter(
+
+		|x| x
+		    .split_whitespace()
+		    .next().unwrap_or("#")
+		    .bytes().next()
+		    .unwrap() != b'#'
+	    ).collect();
+	
+	info!("Songs: {}",
+	      song_names.iter().fold(String::new(),
+				     |a, b| format!("{} {}", a, b)));
+
+	if song_names.len() == 0 {
+	    panic!("No songs in list");
+	}
+	
+	let dir = PathBuf::from(dir_name.as_str());
+	if !dir.is_dir() {
+	    panic!("{} is not a directory!", dir.to_str().unwrap());
+	}
+	self.server_state.lock().unwrap().settings = HashMap::new();
+
+	// Todo Remember this between invocations
+	self.server_state.lock().unwrap().instrument
+	    = String::from(song_names[0]);
+
+	for entry in dir.read_dir().expect("read_dir call failed") {
+	    if let Ok(entry) = entry {
+		// entry is std::fs::DirEntry
+		let p = entry.path();
+		if p.as_path().is_file() &&
+		    p.as_path().extension().is_none() {
+			// Files with no extension are descriptions of
+			// settings for the instrument
+			let song_name =
+			    p.file_name().unwrap()
+			    .to_str().unwrap()
+			    .to_string();
+			info!("Song name: {} ", song_name);
+			if song_names.contains(&song_name.as_ref()) {
+			    info!("In");
+			    self.server_state.lock().unwrap()
+				.settings.insert(song_name.clone(),
+						 PathBuf::from(song_name));
+			}else{
+			    info!("Out");
+			}			    
+		    }
+	    }	
+	}
+
+	self.server_state.lock().unwrap()
+	    .settings.iter().fold(
+	    String::new(), |a, b| a + " " + b.0.as_str()
+	)
+    }
+    fn new(
+	out:ws::Sender,
+	rx:mpsc::Receiver<State>,
+    	server_state:Arc<Mutex<ServerState>>,
+    ) -> Self {
+	let mut ret = Self {
+	    out:out,
+	    server_state:server_state,
+	};
+	ret.run(rx);
+	ret
+    }
+    fn run(&mut self, rx:mpsc::Receiver<State>){
+	println!("MyHandlerServer::run");
+	let out_t = self.out.clone();
+    	thread::spawn(move || {
+    	    loop {
+    		let state = match rx.recv() {
+    		    Ok(s) => s,
+    		    Err(err) => {
+    			println!("MyHandlerServer: {:?}", err);
+    			break;
+    		    }
+    		};
+    		println!("MyHandlerServer: Got state: {}", state.state);
+
+		match out_t.send(format!("Server sending state: {:?}", state)
+				 .as_str()) {
+		    Ok(x) =>
+			println!("MyHandlerServer::run Sent {:?} result: {:?}",
+				 state, x),
+		    Err(x) => panic!("{}", x),
+		};
+    	    };
+    	});
+    }	
+}
+
+impl MyFactoryServer {
+    // fn new(rx:mpsc::Receiver<State>) -> Self {
+    fn new() -> Self {
+	let ret = Self {
+	    txs:Arc::new(Mutex::new(Vec::new())),
+	    server_state:Arc::new(Mutex::new(ServerState{
+		instruments:Vec::new(),
+		instrument:String::new(),
+		settings:HashMap::new(),
+	    })),
+	};
+	ret
+    }
+
+    fn run(&mut self, rx:mpsc::Receiver<State>) -> 
+	Option<thread::JoinHandle<()>> {
+	    println!("MyFactoryServer::run");
+	    let arc_txs = self.txs.clone();
+	    Some(thread::spawn(move || {
+		loop {
+		    let state = match rx.recv() {
+			Ok(s) => s,
+			Err(err) => {
+			    println!("rx error: {:?}", err);
+			    break;
+			}
+		    };
+		    println!("MyFactoryServer: Got state: {}", &state.state);
+
+		    for tx in &*arc_txs.lock().unwrap() {
+		        match tx.send(state) {
+			    Ok(x) => println!("FactoryServer sent: {:?}", x),
+			    Err(e) => println!("FactoryServer err: {:?}", e),
+			};
+		    }
+		};
+	    }))
+	}
 }
 
 impl ws::Factory for MyFactoryServer {
@@ -117,20 +282,22 @@ impl ws::Handler for MyHandlerServer {
 			    if cmds.len() > 1 {
 				info!(
 				    "Calling set_instrument({:?})",
-				    self.settings.get(cmds[1])
+				    self.server_state.lock().unwrap()
+					.settings.get(cmds[1])
 					.unwrap()
 					.to_path_buf()
 				);
-				self.server_state.lock().unwrap().thing =
+				self.server_state.lock().unwrap().instrument =
 				    set_instrument(
-					self.settings.get(cmds[1]).unwrap().
+					self.server_state.lock().unwrap()
+					    .settings.get(cmds[1]).unwrap().
 					    to_path_buf());
 				info!("Returned from set_instrument");
 			    }
 	    		    shared::ServerMessage{
 				id: client_id,
 				text: self.server_state.lock().unwrap().
-				    thing.clone()
+				    instrument.clone()
 			    }
 			},
 		    	key => shared::ServerMessage{
@@ -158,151 +325,8 @@ impl ws::Handler for MyHandlerServer {
     }
 }
 
-impl MyFactoryServer {
-    // fn new(rx:mpsc::Receiver<State>) -> Self {
-    fn new() -> Self {
-	let ret = Self {
-	    txs:Arc::new(Mutex::new(Vec::new())),
-	    server_state:Arc::new(Mutex::new(ServerState{
-		things:Vec::new(),
-		thing:String::new(),
-	    })),
-	};
-	ret
-    }
-
-    fn run(&mut self, rx:mpsc::Receiver<State>) -> 
-	Option<thread::JoinHandle<()>> {
-	    println!("MyFactoryServer::run");
-	    let arc_txs = self.txs.clone();
-	    Some(thread::spawn(move || {
-		loop {
-		    let state = match rx.recv() {
-			Ok(s) => s,
-			Err(err) => {
-			    println!("rx error: {:?}", err);
-			    break;
-			}
-		    };
-		    println!("MyFactoryServer: Got state: {}", &state.state);
-
-		    for tx in &*arc_txs.lock().unwrap() {
-		        match tx.send(state) {
-			    Ok(x) => println!("FactoryServer sent: {:?}", x),
-			    Err(e) => println!("FactoryServer err: {:?}", e),
-			};
-		    }
-		};
-	    }))
-	}
-}
 
 
-impl MyHandlerServer {
-    fn init_for_client(&mut self) -> String {
-
-	// Find the direcory with the instrument data in it.
-	let current_dir = env::current_dir().unwrap();
-	let dir = current_dir.parent().unwrap();
-	let dir_name = dir.to_str().unwrap().to_string() + "/songs";
-	let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
-
-	let mut list_d = String::new();
-	info!("list_name: {}", list_name);
-
-	File::open(list_name.as_str()).unwrap()
-	    .read_to_string(&mut list_d).unwrap();
-
-	let  song_names:Vec<&str> =
-	    list_d.as_str().lines().filter(|x| x
-					   .split_whitespace()
-					   .next().unwrap_or("#")
-					   .bytes().next()
-					   .unwrap() != b'#').collect();
-	
-	info!("Songs: {}",
-	      song_names.iter().fold(String::new(),
-				     |a, b| format!("{} {}", a, b)));
-
-	if song_names.len() == 0 {
-	    panic!("No songs in list");
-	}
-	
-	let dir = PathBuf::from(dir_name.as_str());
-	if !dir.is_dir() {
-	    panic!("{} is not a directory!", dir.to_str().unwrap());
-	}
-	self.settings = HashMap::new();
-
-	// Todo Remember this between invocations
-	self.server_state.lock().unwrap().thing = song_names[0].to_string();
-
-	for entry in dir.read_dir().expect("read_dir call failed") {
-	    if let Ok(entry) = entry {
-		// entry is std::fs::DirEntry
-		let p = entry.path();
-		if p.as_path().is_file() &&
-		    p.as_path().extension().is_none() {
-			// Files with no extension are descriptions of
-			// settings for the instrument
-			let song_name =
-			    p.file_name().unwrap()
-			    .to_str().unwrap()
-			    .to_string();
-			info!("Song name: {} ", song_name);
-			if song_names.contains(&song_name.as_ref()) {
-			    info!("In");
-			    self.settings.insert(song_name.clone(),
-						 PathBuf::from(song_name));
-			}else{
-			    info!("Out");
-			}			    
-		    }
-	    }	
-	}
-
-	self.settings.iter().fold(
-	    String::new(), |a, b| a + " " + b.0.as_str()
-	)
-    }
-    fn new(
-	out:ws::Sender,
-	rx:mpsc::Receiver<State>,
-    	server_state:Arc<Mutex<ServerState>>,
-    ) -> Self {
-	let mut ret = Self {
-	    out:out,
-	    server_state:server_state,
-	    settings:HashMap::new(),
-	};
-	ret.run(rx);
-	ret
-    }
-    fn run(&mut self, rx:mpsc::Receiver<State>){
-	println!("MyHandlerServer::run");
-	let out_t = self.out.clone();
-    	thread::spawn(move || {
-    	    loop {
-    		let state = match rx.recv() {
-    		    Ok(s) => s,
-    		    Err(err) => {
-    			println!("MyHandlerServer: {:?}", err);
-    			break;
-    		    }
-    		};
-    		println!("MyHandlerServer: Got state: {}", state.state);
-
-		match out_t.send(format!("Server sending state: {:?}", state)
-				 .as_str()) {
-		    Ok(x) =>
-			println!("MyHandlerServer::run Sent {:?} result: {:?}",
-				 state, x),
-		    Err(x) => panic!("{}", x),
-		};
-    	    };
-    	});
-    }	
-}
 
 // Websocket server code ends
 // ---------------------------------------------
