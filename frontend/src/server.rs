@@ -1,8 +1,3 @@
-// use ws::{listen, CloseCode, Handler, Message, Request, Response,
-// 	 Result, ErrorKind, Error, Sender};
-
-// use std::sync::mpsc::{Sender, Receiver};
-//use serde_json::Result;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process::Command;
@@ -17,7 +12,10 @@ use simple_logger::SimpleLogger;
 
 // https://docs.rs/ws/
 use ws;
+// use ws::{listen, CloseCode, Handler, Message, Request, Response,
+// 	 Result, ErrorKind, Error, Sender};
 
+// Message formats for ws Server and Client Message
 mod shared;
 
 // ---------------------------------------------
@@ -25,10 +23,12 @@ mod shared;
 #[derive(Copy, Clone, Debug)]
 struct State {
 
+    // TODO Should this be called `PedalState`?
+    
     // `state` is to be set by a pedal.  The pedal available has three
-    // pedals, that ioperate via USB port and look like a keyboard
-    // with three keys: 'a', 'b', 'c'.  Changnig `state` will change
-    // the LV2 effects loaded into the signal path.
+    // pedals, that operate via USB port and look like a keyboard with
+    // three keys: 'a', 'b', 'c'.  Changnig `state` will change the
+    // LV2 effects loaded into the signal path.
     state:char
 }
 
@@ -39,8 +39,9 @@ struct State {
 struct ServerState {
 
     // Each instrument is a file in the directory "songs" (FIXME: The
-    // name "songs" is terrible)
-    instrument: String,
+    // name "songs" is terrible).  This is the name of the selected
+    // instrument
+    selected_instrument: String,
 
     // Map a instrument name to the path tp the file that describes
     // it.  When `control` is used this is the file name passed as
@@ -52,10 +53,11 @@ struct ServerState {
 impl ServerState {
 
     fn new() -> Self {
+	// TODO FIXME `load_instruments` can return a ServerState
 	let (a, b) = load_instruments();
 	Self{
 	    instruments:b,
-	    instrument:a,
+	    selected_instrument:a,
 	}
     }  
 }
@@ -81,6 +83,7 @@ struct MyHandlerServer{
 
 impl MyHandlerServer {
     fn init_for_client(&mut self) -> String {
+	panic!("Deprecated!");
 	"".to_string()
     }
     fn new(
@@ -95,22 +98,30 @@ impl MyHandlerServer {
 	ret.run(rx);
 	ret
     }
+
     fn run(&mut self, rx:mpsc::Receiver<State>){
+	// Listem for state updates
+	
 	println!("MyHandlerServer::run");
 	let out_t = self.out.clone();
     	thread::spawn(move || {
     	    loop {
     		let state = match rx.recv() {
+		    
+		    // Got sent new state information to propagate
     		    Ok(s) => s,
+
     		    Err(err) => {
     			println!("MyHandlerServer: {:?}", err);
     			break;
     		    }
     		};
+
     		println!("MyHandlerServer: Got state: {}", state.state);
 
-		match out_t.send(format!("Server sending state: {:?}", state)
-				 .as_str()) {
+		match out_t.send(
+		    format!("Server sending state: {:?}", state).as_str()
+		) {
 		    Ok(x) =>
 			println!("MyHandlerServer::run Sent {:?} result: {:?}",
 				 state, x),
@@ -234,7 +245,7 @@ impl ws::Handler for MyHandlerServer {
 				    self.server_state.lock().unwrap()
 					.instruments.get(instrument_name).unwrap()
 				);
-				server_state.instrument =
+				server_state.selected_instrument =
 				    instrument_name.to_string();
 				    
 				info!("Returned from set_instrument");
@@ -242,7 +253,7 @@ impl ws::Handler for MyHandlerServer {
 	    		    shared::ServerMessage{
 				id: client_id,
 				text: self.server_state.lock().unwrap().
-				    instrument.clone()
+				    selected_instrument.clone()
 			    }
 			},
 		    	key => shared::ServerMessage{
