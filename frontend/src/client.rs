@@ -229,11 +229,11 @@ fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>
 // ------ ------
 
 
-fn main_div(instrument: String,
+fn instrument_div(instrument: String,
 	    height:f32, // Proportion of page
 	    selected:&Option<Selected>) -> Node<Msg> {
 
-    // log!(my_now(), format!("{} main_div({})", my_now(), instrument));
+    // log!(my_now(), format!("{} instrument_div({})", my_now(), instrument));
 
     let class = match selected {
 	None =>  "unselected",
@@ -309,7 +309,7 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
 	for i in model.instruments.iter() {
 	    // log!(format!("{} View: Instrument: {}", my_now(), i));
 	    ret.push(
-		main_div(
+		instrument_div(
 		    i.clone(),
 		    1.0_f32/model.instruments.len() as f32,
 		    &model.selected,
