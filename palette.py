@@ -48,7 +48,7 @@ class Palette(object):
 			setattr(self, color_name, cycle)
 
 
-data = yaml.load(open("palette.yaml"))
+data = yaml.safe_load(open("palette.yaml"))
 
 palette = Palette(data)
 
