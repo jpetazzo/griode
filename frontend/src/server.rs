@@ -21,10 +21,8 @@ mod shared;
 // ---------------------------------------------
 // Websocket server code starts
 #[derive(Copy, Clone, Debug)]
-struct State {
+struct PedalState {
 
-    // TODO Should this be called `PedalState`?
-    
     // `state` is to be set by a pedal.  The pedal available has three
     // pedals, that operate via USB port and look like a keyboard with
     // three keys: 'a', 'b', 'c'.  Changnig `state` will change the
@@ -35,6 +33,9 @@ struct State {
 /// `ServerState` is used by the Server to do its (non-ws) jobs.  It
 /// needs to be accessible to the `Handler` instances so they can
 /// initialise clients and respond to the client requests.
+/// `ServerState` stores the available instruments in a Hash String =>
+/// String of names to file paths, and the current instrument as
+/// String
 #[derive(Clone, Debug)]
 struct ServerState {
 
@@ -43,37 +44,36 @@ struct ServerState {
     // instrument
     selected_instrument: String,
 
-    // Map a instrument name to the path tp the file that describes
+    // Map a instrument name to the path for the file that describes
     // it.  When `control` is used this is the file name passed as
     // argument.  Stored as String not PathBuf because it is not
-    // opened in Rust
+    // opened in Rust but passed to `control`
     instruments:HashMap<String, String>,
 }
 
 impl ServerState {
 
     fn new() -> Self {
-	// TODO FIXME `load_instruments` can return a ServerState
-	let (a, b) = load_instruments();
-	Self{
-	    instruments:b,
-	    selected_instrument:a,
-	}
+	load_instruments()
     }  
 }
 
 struct MyFactoryServer{
     
     // A transmitter for each `Handle` so changes in state can be
-    // propagated
-    txs:Arc<Mutex<Vec<mpsc::Sender<State>>>>,
+    // propagated to the `MyHandlerServer` objects, and thus to the
+    // clients
+    txs:Arc<Mutex<Vec<mpsc::Sender<PedalState>>>>,
 
-    // The state of the server.  It is shared state 
+    // The state of the server.  It is shared state, shared with the
+    // `MyHandlerServer` objects.  They can change it
     server_state:Arc<Mutex<ServerState>>,
 
 }
 
 struct MyHandlerServer{
+
+    // For communicating with clients
     out:ws::Sender,
 
     // Local copy of state
@@ -82,24 +82,51 @@ struct MyHandlerServer{
 }
 
 impl MyHandlerServer {
+
+    /// The information clients need to bootstrap.
     fn init_for_client(&mut self) -> String {
-	panic!("Deprecated!");
-	"".to_string()
+	let server_state =
+	    self.server_state.lock().unwrap();
+	let mut ret = "".to_string();
+	ret += format!("{}\n", server_state.selected_instrument).as_str();
+	for (_, x) in server_state.instruments.iter() {
+	    ret = format!("{} {}", ret, x);
+	}
+	ret += "\n"	;
+	ret
     }
+
+    /// `MyHandlerServer` is constructed with three arguments: (1) The
+    /// communication channel with clients (2) The channel to get
+    /// messages from the factory that created this (3) Shared state.
+    /// Shared with all other `MyHandlerServer` objects and the
+    /// `MyFactoryServer` object that runs the show
     fn new(
+	// Talk to clients
 	out:ws::Sender,
-	rx:mpsc::Receiver<State>,
+
+	// Get messages from server to send to clients
+	rx:mpsc::Receiver<PedalState>,
+
+	// Read and adjust the servers state
     	server_state:Arc<Mutex<ServerState>>,
+	
     ) -> Self {
 	let mut ret = Self {
 	    out:out,
 	    server_state:server_state,
 	};
+
+	// `run` spawns a thread and runs in background broadcasting
+	// changes in state to clients
 	ret.run(rx);
 	ret
     }
 
-    fn run(&mut self, rx:mpsc::Receiver<State>){
+    /// `run` spawns a thread to listen for pedal state changes from
+    /// `MyFactoryServer`.  Then pass it on to the clients so they can
+    /// update their displays
+    fn run(&mut self, rx:mpsc::Receiver<PedalState>){
 	// Listem for state updates
 	
 	println!("MyHandlerServer::run");
@@ -119,21 +146,25 @@ impl MyHandlerServer {
 
     		println!("MyHandlerServer: Got state: {}", state.state);
 
-		match out_t.send(
-		    format!("Server sending state: {:?}", state).as_str()
-		) {
-		    Ok(x) =>
-			println!("MyHandlerServer::run Sent {:?} result: {:?}",
-				 state, x),
-		    Err(x) => panic!("{}", x),
+		// This is the message for the client
+		let content = format!("PEDALSTATE {}", state.state);
+
+		let message = shared::ServerMessage {
+		    id:out_t.token().into(),
+		    text:content,
 		};
-    	    };
-    	});
-    }	
+
+		match send_message(message, &out_t) {
+		    Ok(_) => (),
+		    Err(err) => panic!("{}",err),
+		};
+    	    }
+	});
+    }
 }
 
 impl MyFactoryServer {
-    // fn new(rx:mpsc::Receiver<State>) -> Self {
+
     fn new() -> Self {
 	let ret = Self {
 	    txs:Arc::new(Mutex::new(Vec::new())),
@@ -142,10 +173,16 @@ impl MyFactoryServer {
 	ret
     }
 
-    fn run(&mut self, rx:mpsc::Receiver<State>) -> 
+    /// Spaw a thread to listen for pedal changes on the rx.  When one
+    /// is received send it to all the clients so they can update
+    /// their displays
+    fn run(&mut self, rx:mpsc::Receiver<PedalState>) -> 
 	Option<thread::JoinHandle<()>> {
 	    println!("MyFactoryServer::run");
+
+	    // Copy of the transmiters to send data to each Handler	    
 	    let arc_txs = self.txs.clone();
+
 	    Some(thread::spawn(move || {
 		loop {
 		    let state = match rx.recv() {
@@ -179,6 +216,8 @@ impl ws::Factory for MyFactoryServer {
 }
 
 impl ws::Handler for MyHandlerServer {
+
+    /// What is this doing?  Why?
     fn on_request(&mut self, req: &ws::Request) -> ws::Result<ws::Response> {
         match req.resource() {
             "/ws" => ws::Response::from_request(req),
@@ -190,15 +229,14 @@ impl ws::Handler for MyHandlerServer {
         }
     }
 
-    // Handle messages recieved in the websocket (in this case, only on `/ws`).
+    /// Handle messages recieved in the websocket (in this case, only
+    /// on `/ws`)
     fn on_message(&mut self, msg: ws::Message) -> ws::Result<()> {
         let client_id: usize = self.out.token().into();
 
+	// Only process text messages
         if !msg.is_text() {
-	    // There are two types of websocket in ws.rs: Text,
-	    // Binary.  Only Text is handled See
-	    // https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType
-	    // for details of binary types
+
 	    Err(ws::Error::new(
 		ws::ErrorKind::Internal,
 		"Unknown message type"))
@@ -209,12 +247,17 @@ impl ws::Handler for MyHandlerServer {
 		info!("client_msg: {}", client_msg);
 		let m:shared::ClientMessage =
 		    serde_json::from_str(client_msg.as_str()).unwrap();
+
+		// The first word of the message (might be) is a command
 		let cmds:Vec<&str> = m.text.split_whitespace().collect();
+
 		let response =
 		    match cmds[0] {
 
+			// INIT from client is asking for the
+			// information it needs to initialise its
+			// state.
 		    	"INIT" => {
-			    // Client is asking for the data it needs to set up
 
 			    let return_msg = format!(
 				"INIT {}",
@@ -227,6 +270,10 @@ impl ws::Handler for MyHandlerServer {
 			    }
 		    	},
 
+			// INSTR is when a user has selected a
+			// instrument.  The thing called "PedalState"
+			// here is a modification to a instrument made
+			// by a pedal on the server.  True story.
 			"INSTR" => {
 			    // INSTR <instrument name>
 			    // User has selected a instrument
@@ -238,12 +285,15 @@ impl ws::Handler for MyHandlerServer {
 
 				info!(
 				    "Calling set_instrument({:?})",
-				    server_state.instruments.get(instrument_name)
+				    server_state.
+					instruments.get(instrument_name)
 					.unwrap()
 				);
 				set_instrument(
-				    self.server_state.lock().unwrap()
-					.instruments.get(instrument_name).unwrap()
+				    server_state
+				    // self.server_state.lock().unwrap()
+					.instruments.get(instrument_name).
+					unwrap()
 				);
 				server_state.selected_instrument =
 				    instrument_name.to_string();
@@ -256,6 +306,8 @@ impl ws::Handler for MyHandlerServer {
 				    selected_instrument.clone()
 			    }
 			},
+			
+			// What is this?  Just a echo?
 		    	key => shared::ServerMessage{
 			    id: client_id,
 			    text: key.to_string()
@@ -281,12 +333,6 @@ impl ws::Handler for MyHandlerServer {
     }
 }
 
-fn get_dir() -> String {
-    let current_dir = env::current_dir().unwrap();
-    let dir = current_dir.parent().unwrap();
-    dir.to_str().unwrap().to_string() + "/songs"
-}
-
 fn set_instrument(file_path:&str) {
 
 
@@ -294,7 +340,11 @@ fn set_instrument(file_path:&str) {
 
     let exec_name = format!(
 	"{}/control",
-	env::current_dir().unwrap().parent().unwrap().to_str().unwrap()
+	// Why the parent of the current directory?  FIXME This is
+	// obscure
+	env::current_dir().unwrap()
+	    .parent().unwrap()
+	    .to_str().unwrap()
     );    
 
     let cmd = format!("{} {}", exec_name, file_path);
@@ -318,10 +368,7 @@ fn send_message(server_msg: shared::ServerMessage,
     out.broadcast(server_msg)
 }    
 
-
-
-
-fn load_instruments() -> (String, HashMap<String, String>) {
+fn load_instruments() -> ServerState {
 
     // Find the direcory with the instrument data in it.
     let current_dir = env::current_dir().unwrap();
@@ -388,7 +435,10 @@ fn load_instruments() -> (String, HashMap<String, String>) {
 		}
 	}	
     }
-    (ret0, ret1)
+    ServerState {
+	selected_instrument:ret0,
+	instruments:ret1,
+    }
 }
 
 fn main() -> std::io::Result<()>{
@@ -399,9 +449,9 @@ fn main() -> std::io::Result<()>{
     // Create channel to communicate with the server.  
     let (tx, rx) = mpsc::channel();
 
-    let mut my_server = MyFactoryServer::new();
-    let server_handle = my_server.run(rx);
-    let wss = ws::WebSocket::new(my_server).unwrap();
+    let mut my_factory = MyFactoryServer::new();
+    let server_handle = my_factory.run(rx);
+    let wss = ws::WebSocket::new(my_factory).unwrap();
     
 
     let s_thread = thread::spawn(move || {
@@ -409,10 +459,11 @@ fn main() -> std::io::Result<()>{
     });
     
     thread::spawn(move || {
+	// Simulate a pedal 
 	for _ in 0..10 {
 	    let onhundred_millis = time::Duration::from_millis(100);
 	    thread::sleep(onhundred_millis);
-	    tx.send(State{state:'a'}).unwrap();
+	    tx.send(PedalState{state:'a'}).unwrap();
 	}
     });
     server_handle.unwrap().join().unwrap();
