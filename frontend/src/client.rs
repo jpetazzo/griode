@@ -24,13 +24,16 @@ pub struct Model {
     // Each instrument is represented by a string
     instruments: Vec<String>,
 
-
     // There is zero or one selected instrument.  Store it with its
     // name and state.  If none selected it is None
     selected:Option<Selected>,
-    
+
+    // Count how many messages get sent.  FIXME Why?  
     sent_messages_count: usize,
+
+    // All messages received end up in here.  FIXME Why?
     messages: Vec<String>,
+
     input_text: String,
     input_binary: String,
     web_socket: WebSocket,
@@ -58,9 +61,13 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     }
 }
 
+/// Called when a message is received
 fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
     log!(my_now(), format!("update"));
     match msg {
+
+	// Opened a websocked.  Send a message asking for data to
+	// initialise the client
         Msg::WebSocketOpened => {
             log!(my_now(), "WebSocket connection is open now");
             model.web_socket_reconnector = None;
@@ -78,13 +85,20 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 
         }
 
+	// The server has sent some information
         Msg::TextMessageReceived(message) => {
             log!( my_now(), "Client received a text message",message.text);
 
 	    // FIXME This should split on new lines so instruments can
 	    // have spaces in their names.
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
+
+	    // The first word is the command.  
 	    match cmds[0] {
+
+		// The data needed to establisg the client state.  The
+		// selected instrument (in .Ready state), the possable
+		// instruments
 		"INIT" => {
 		    assert!(cmds.len() > 2);
 		    log!(my_now(), "Got INIT");
@@ -99,7 +113,8 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 			model.instruments.push(cmds[i].to_string())
 		    }			
 		},
-
+		"PEDALSTATE" => {
+		},
 		key => {
 		    log!(my_now(), format!("Got key: {}", &key));
 		    model.selected = Some(
@@ -110,6 +125,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 		    );
 		},
 	    }
+	    
             model.messages.push(message.text);
 	}
 	Msg::BinaryMessageReceived(message) => {
@@ -188,16 +204,14 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 
 fn view(model: &Model) -> Vec<Node<Msg>> {
     
-    // log!(my_now(), format!("{} View.  instruments len: {}",
-    // 		 my_now(), model.instruments.len()));
-
-
     // `body` is a convenience function to access the web_sys DOM
     // body. https://docs.rs/seed/0.8.0/seed/browser/util/fn.body.html
     body().style().set_css_text("height: 100%");
 
     let mut ret:Vec<Node<Msg>> = Vec::new();
 
+    // If the client is talking to a server, only then can it have
+    // meaningful existence
     if model.web_socket.state() == web_socket::State::Open {
 	
 	for i in model.instruments.iter() {
@@ -216,7 +230,6 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     ret
 }
 
-
 pub enum Msg {
     WebSocketOpened,
     TextMessageReceived(shared::ServerMessage),
@@ -230,7 +243,6 @@ pub enum Msg {
     SendMessage(shared::ClientMessage),
     SendBinaryMessage(shared::ClientMessage),
 }
-
 
 fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
     let msg_sender = orders.msg_sender();
