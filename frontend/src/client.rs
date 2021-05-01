@@ -58,22 +58,6 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     }
 }
 
-
-
-pub enum Msg {
-    WebSocketOpened,
-    TextMessageReceived(shared::ServerMessage),
-    BinaryMessageReceived(shared::ServerMessage),
-    CloseWebSocket,
-    WebSocketClosed(CloseEvent),
-    WebSocketFailed,
-    ReconnectWebSocket(usize),
-    InputTextChanged(String),
-    InputBinaryChanged(String),
-    SendMessage(shared::ClientMessage),
-    SendBinaryMessage(shared::ClientMessage),
-}
-
 fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
     log!(my_now(), format!("update"));
     match msg {
@@ -96,9 +80,13 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 
         Msg::TextMessageReceived(message) => {
             log!( my_now(), "Client received a text message",message.text);
+
+	    // FIXME This should split on new lines so instruments can
+	    // have spaces in their names.
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
 	    match cmds[0] {
 		"INIT" => {
+		    assert!(cmds.len() > 2);
 		    log!(my_now(), "Got INIT");
 		    model.instruments.clear();
 		    for i in 1..cmds.len() {
@@ -191,6 +179,52 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 	}
     }
 }
+
+fn view(model: &Model) -> Vec<Node<Msg>> {
+    
+    // log!(my_now(), format!("{} View.  instruments len: {}",
+    // 		 my_now(), model.instruments.len()));
+
+
+    // `body` is a convenience function to access the web_sys DOM
+    // body. https://docs.rs/seed/0.8.0/seed/browser/util/fn.body.html
+    body().style().set_css_text("height: 100%");
+
+    let mut ret:Vec<Node<Msg>> = Vec::new();
+
+    if model.web_socket.state() == web_socket::State::Open {
+	
+	for i in model.instruments.iter() {
+	    // log!(format!("{} View: Instrument: {}", my_now(), i));
+	    ret.push(
+		instrument_div(
+		    i.clone(),
+		    1.0_f32/model.instruments.len() as f32,
+		    &model.selected,
+		)
+	    );
+        }
+    } else {
+        ret.push(div![p![em!["Connecting or closed"]]]);
+    }
+    ret
+}
+
+
+pub enum Msg {
+    WebSocketOpened,
+    TextMessageReceived(shared::ServerMessage),
+    BinaryMessageReceived(shared::ServerMessage),
+    CloseWebSocket,
+    WebSocketClosed(CloseEvent),
+    WebSocketFailed,
+    ReconnectWebSocket(usize),
+    InputTextChanged(String),
+    InputBinaryChanged(String),
+    SendMessage(shared::ClientMessage),
+    SendBinaryMessage(shared::ClientMessage),
+}
+
 
 fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
     let msg_sender = orders.msg_sender();
@@ -290,36 +324,6 @@ fn instrument_div(instrument: String,
 	    format!("{}", &instrument),
 	],
     ]
-}
-
-fn view(model: &Model) -> Vec<Node<Msg>> {
-    
-    // log!(my_now(), format!("{} View.  instruments len: {}",
-    // 		 my_now(), model.instruments.len()));
-
-
-    // `body` is a convenience function to access the web_sys DOM
-    // body. https://docs.rs/seed/0.8.0/seed/browser/util/fn.body.html
-    body().style().set_css_text("height: 100%");
-
-    let mut ret:Vec<Node<Msg>> = Vec::new();
-
-    if model.web_socket.state() == web_socket::State::Open {
-	
-	for i in model.instruments.iter() {
-	    // log!(format!("{} View: Instrument: {}", my_now(), i));
-	    ret.push(
-		instrument_div(
-		    i.clone(),
-		    1.0_f32/model.instruments.len() as f32,
-		    &model.selected,
-		)
-	    );
-        }
-    } else {
-        ret.push(div![p![em!["Connecting or closed"]]]);
-    }
-    ret
 }
 
 // ------ ------
