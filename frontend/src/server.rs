@@ -1,3 +1,4 @@
+use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process::Command;
@@ -153,7 +154,7 @@ impl MyHandlerServer {
 		    id:out_t.token().into(),
 		    text:content,
 		};
-
+		
 		match send_message(message, &out_t) {
 		    Ok(_) => (),
 		    Err(err) => panic!("{}",err),
@@ -188,11 +189,12 @@ impl MyFactoryServer {
 		    let state = match rx.recv() {
 			Ok(s) => s,
 			Err(err) => {
-			    println!("rx error: {:?}", err);
+			    println!("Sender has hung up: {}", err);
 			    break;
 			}
 		    };
-		    println!("MyFactoryServer: Got state: {}", &state.state);
+		    println!("MyFactoryServer: Got state: {}",
+			     &state.state);
 
 		    for tx in &*arc_txs.lock().unwrap() {
 		        match tx.send(state) {
@@ -370,14 +372,38 @@ fn send_message(server_msg: shared::ServerMessage,
 
 fn load_instruments() -> ServerState {
 
-    // Find the direcory with the instrument data in it.
-    let current_dir = env::current_dir().unwrap();
-    let dir = current_dir.parent().unwrap();
-    let dir_name = dir.to_str().unwrap().to_string() + "/songs";
+    // Build the list of song files (TODO "song" is a bad name!) and
+    // select one to be current. That defines a `ServerState`.
+
+    // The "songs" are configuration files, all in the same directory.
+    // In that directory there is a file "LIST" that has the "songs"
+    // that will be presented to the user.
+
+    // First find the directory:
+    let dir = match env::var("INSTRUMENT_DIRECTORY"){
+	Ok(d) => d,
+	Err(_) => {
+	    // Environment variable not set.  Try to find it relative
+	    // to the current directory
+	    
+	    
+	    // Find the direcory with the instrument data in it.
+	    let current_dir = env::current_dir().unwrap();
+	    let dir = current_dir.parent().unwrap();
+	    dir.to_str().unwrap().to_string() + "/songs"
+	},
+    };
+
+    // Check `dir` exists and names a directory
+    assert!(fs::metadata(dir.as_str()).unwrap().file_type().is_dir());
 
     // Get the list of instruments that are used. There can be more
     // instruments in the directpry than are used.
-    let list_name = dir.to_str().unwrap().to_string() + "/songs/LIST";
+    let list_name = format!("{}/LIST", &dir);
+    
+    // Check `dir` exists and does not name a directory
+    assert!(!fs::metadata(list_name.as_str()).unwrap().file_type().is_dir());
+
     info!("list_name: {}", list_name);
 
     let mut list_d = String::new();
@@ -385,50 +411,64 @@ fn load_instruments() -> ServerState {
     File::open(list_name.as_str()).unwrap()
 	.read_to_string(&mut list_d).unwrap();
 
-    // The names of the songs to use
-    let  song_names:Vec<&str> =
+    // The names of the instruments to use
+    let  instrument_names:Vec<&str> =
 	list_d.as_str().lines().filter(
 
 	    |x| x
+		// This is opaque!  It skips blank lines and lines
+		// where first non-whitespace character is '#'
+
+		// Split line into whitspace seperated words
 		.split_whitespace()
+		
+		// Choose the next word.  If no words return "#"
 		.next().unwrap_or("#")
-		.bytes().next()
-		.unwrap() != b'#'
+		
+		.bytes().next() // Get first byte
+
+		.unwrap() != b'#' // If it is not '#' then line accepted
+
 	).collect();
     
-    if song_names.len() == 0 {
-	panic!("No songs in list");
+    if instrument_names.len() == 0 {
+	panic!("No instruments in list");
     }
     
-    info!("Songs: {}",
-	  song_names.iter().fold(String::new(),
+    info!("Instruments: {}",
+	  instrument_names.iter().fold(String::new(),
 				 |a, b| format!("{} {}", a, b)));
 
-    let dir = PathBuf::from(dir_name.as_str());
+    let dir = PathBuf::from(dir.as_str());
     if !dir.is_dir() {
 	panic!("{} is not a directory!", dir.to_str().unwrap());
     }
 
-    // Todo Remember this between invocations
-    let ret0 = String::from(song_names[0]);
-    let mut ret1 = HashMap::new();
+    
+    let selected_instrument = String::from(instrument_names[0]);
+    let mut instruments = HashMap::new();
 
     for entry in dir.read_dir().expect("read_dir call failed") {
 	if let Ok(entry) = entry {
 	    // entry is std::fs::DirEntry
 	    let p = entry.path();
+
+	    // Files with no extension are descriptions of settings
+	    // for the instrument so find them
 	    if p.as_path().is_file() &&
 		p.as_path().extension().is_none() {
 
-		    // Files with no extension are descriptions of
-		    // settings for the instrument
-		    let song_name =
+		    // Just the name, extraced from the path
+		    let instrument_name =
 			p.file_name().unwrap()
 			.to_str().unwrap()
 			.to_string();
-		    
-		    if song_names.contains(&song_name.as_ref()) {
-			ret1.insert(song_name.clone(),
+
+		    // If the instrument name is in the list of
+		    // instruments to present to the user then store
+		    // it in the vector
+		    if instrument_names.contains(&instrument_name.as_ref()) {
+			instruments.insert(instrument_name.clone(),
 				    p.to_str().unwrap().to_string());
 		    }else{
 		    }			    
@@ -436,8 +476,8 @@ fn load_instruments() -> ServerState {
 	}	
     }
     ServerState {
-	selected_instrument:ret0,
-	instruments:ret1,
+	selected_instrument:selected_instrument,
+	instruments:instruments,
     }
 }
 
