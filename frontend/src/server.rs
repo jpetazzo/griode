@@ -144,8 +144,6 @@ impl MyHandlerServer {
     		    }
     		};
 
-    		println!("MyHandlerServer: Got state: {}", state.state);
-
 		// This is the message for the client
 		let content = format!("PEDALSTATE {}", state.state);
 
@@ -192,8 +190,6 @@ impl MyFactoryServer {
 			    break;
 			}
 		    };
-		    println!("MyFactoryServer: Got state: {}",
-			     &state.state);
 
 		    for tx in &*arc_txs.lock().unwrap() {
 		        match tx.send(state) {
@@ -242,15 +238,17 @@ impl ws::Handler for MyHandlerServer {
 		ws::ErrorKind::Internal,
 		"Unknown message type"))
 	}else{
+
 	    // `msg` is type: `ws::Message::Text(String)` The
 	    // contained string is JSON shared::ServerMessage
 	    if let ws::Message::Text(client_msg)  =  msg {
-		info!("client_msg: {}", client_msg);
-		let m:shared::ClientMessage =
+
+		let client_message:shared::ClientMessage =
 		    serde_json::from_str(client_msg.as_str()).unwrap();
 
 		// The first word of the message (might be) is a command
-		let cmds:Vec<&str> = m.text.split_whitespace().collect();
+		let cmds:Vec<&str> = client_message.text
+		    .split_whitespace().collect();
 
 		let response =
 		    match cmds[0] {
@@ -264,7 +262,7 @@ impl ws::Handler for MyHandlerServer {
 				"INIT {}",
 				self.init_for_client()
 			    );
-		    	    info!("Got INIT\nSEND: {}", return_msg);			    
+
 	    		    shared::ServerMessage{
 				id: client_id,
 				text: return_msg
@@ -272,9 +270,7 @@ impl ws::Handler for MyHandlerServer {
 		    	},
 
 			// INSTR is when a user has selected a
-			// instrument.  The thing called "PedalState"
-			// here is a modification to a instrument made
-			// by a pedal on the server.  True story.
+			// instrument.
 			"INSTR" => {
 			    // INSTR <instrument name>
 			    // User has selected a instrument
@@ -284,24 +280,16 @@ impl ws::Handler for MyHandlerServer {
 				let mut server_state =
 				    self.server_state.lock().unwrap();
 
-				info!(
-				    "Calling set_instrument({:?})",
-				    server_state.
-					instruments.get(instrument_name)
-					.unwrap()
-				);
 				set_instrument(
 				    server_state
-				    // self.server_state.lock().unwrap()
 					.instruments.get(instrument_name).
 					unwrap()
 				);
 				server_state.selected_instrument =
 				    instrument_name.to_string();
-				    
-				info!("Returned from set_instrument");
 			    }
-	    		    shared::ServerMessage{
+
+			    shared::ServerMessage{
 				id: client_id,
 				text: self.server_state.lock().unwrap().
 				    selected_instrument.clone()
@@ -314,10 +302,10 @@ impl ws::Handler for MyHandlerServer {
 			    text: key.to_string()
 			}
 		    };
+
 		// Broadcast to all connections.
-		
-		info!("Send response: '{:?}'", response.text);
 		send_message(response, &self.out)
+
 	    }else{
 		panic!("No!")
 	    }
