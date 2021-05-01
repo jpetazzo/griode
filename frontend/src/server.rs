@@ -88,8 +88,7 @@ impl MyHandlerServer {
     fn init_for_client(&mut self) -> String {
 	let server_state =
 	    self.server_state.lock().unwrap();
-	let mut ret = "".to_string();
-	ret += format!("{}\n", server_state.selected_instrument).as_str();
+	let mut ret = format!("{}\n", server_state.selected_instrument);
 	for (_, x) in server_state.instruments.iter() {
 	    ret = format!("{} {}", ret, x);
 	}
