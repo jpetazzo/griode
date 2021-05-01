@@ -89,11 +89,17 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 		    assert!(cmds.len() > 2);
 		    log!(my_now(), "Got INIT");
 		    model.instruments.clear();
-		    for i in 1..cmds.len() {
+		    // The first line is the instrument that is selected
+		    model.selected = Some(Selected {
+			name: cmds[1].to_string(),
+			state: SelectedState::Ready,
+		    });
+		    for i in 2..cmds.len() {
 			log!(my_now(), format!("Got instrument {}", cmds[i]));
 			model.instruments.push(cmds[i].to_string())
 		    }			
 		},
+
 		key => {
 		    log!(my_now(), format!("Got key: {}", &key));
 		    model.selected = Some(
