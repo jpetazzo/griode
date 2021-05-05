@@ -1,12 +1,18 @@
-use std::fs;
+use std::collections::HashMap;
+use std::env;
 use std::fs::File;
+use std::fs;
+use std::io::Read;
 use std::io::prelude::*;
+use std::io;
+use std::path::PathBuf;
 use std::process::Command;
+use std::sync::Arc;
+use std::sync::Mutex;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync;
 use std::thread;
 use std::time;
-use std::{env,  path::PathBuf, collections::HashMap};
 
 use log::{info}; //, trace, warn};
 use simple_logger::SimpleLogger;
@@ -171,8 +177,8 @@ impl MyFactoryServer {
 	ret
     }
 
-    /// Spaw a thread to listen for pedal changes on the rx.  When one
-    /// is received send it to all the clients so they can update
+    /// Spawn a thread to listen for pedal changes on the rx.  When
+    /// one is received send it to all the clients so they can update
     /// their displays
     fn run(&mut self, rx:mpsc::Receiver<PedalState>) -> 
 	Option<thread::JoinHandle<()>> {
@@ -479,21 +485,31 @@ fn main() -> std::io::Result<()>{
     let mut my_factory = MyFactoryServer::new();
     let server_handle = my_factory.run(rx);
     let wss = ws::WebSocket::new(my_factory).unwrap();
-    
 
     let s_thread = thread::spawn(move || {
 	wss.listen("0.0.0.0:9000").unwrap()
     });
     
-    thread::spawn(move || {
-	// Simulate a pedal 
-	for _ in 0..10 {
-	    let onhundred_millis = time::Duration::from_millis(100);
-	    thread::sleep(onhundred_millis);
-	    tx.send(PedalState{state:'a'}).unwrap();
-	}
+    let pedal_thread = thread::spawn(move || {
+	loop {
+	    let mut buffer = [0; 1];
+	    let mut f = io::stdin(); 
+	    match f.read(&mut buffer[..]) {
+		Ok(n) => {
+		    assert!(n == 1);
+		    let pedal = char::from(buffer[0]);
+		    println!("> {}", &pedal);
+		    tx.send(PedalState{state:pedal}).unwrap();
+		},
+		Err(err) => println!("Err! {}", err),
+	    };
+	    // let onhundred_millis = time::Duration::from_millis(100);
+	    // thread::sleep(onhundred_millis);
+	}    
     });
+    
     server_handle.unwrap().join().unwrap();
     s_thread.join().unwrap();
+    pedal_thread.join().unwrap();
     Ok(())
 }
