@@ -1,16 +1,15 @@
+extern crate ncurses;
+use ncurses::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::fs;
 use std::io::Read;
-use std::io::prelude::*;
-use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc;
-use std::sync;
 use std::thread;
 use std::time;
 
@@ -492,19 +491,19 @@ fn main() -> std::io::Result<()>{
     
     let pedal_thread = thread::spawn(move || {
 	loop {
-	    let mut buffer = [0; 1];
-	    let mut f = io::stdin(); 
-	    match f.read(&mut buffer[..]) {
-		Ok(n) => {
-		    assert!(n == 1);
-		    let pedal = char::from(buffer[0]);
-		    println!("> {}", &pedal);
-		    tx.send(PedalState{state:pedal}).unwrap();
-		},
-		Err(err) => println!("Err! {}", err),
+	    let b = getch();
+
+	    let c:char;
+	    match b {
+		97 => c = 'a',
+		98 => c = 'b',
+		99 => c = 'c',
+		_ => continue,
 	    };
-	    // let onhundred_millis = time::Duration::from_millis(100);
-	    // thread::sleep(onhundred_millis);
+	    tx.send(PedalState{state:c}).unwrap();
+
+	    let onhundred_millis = time::Duration::from_millis(100);
+	    thread::sleep(onhundred_millis);
 	}    
     });
     
