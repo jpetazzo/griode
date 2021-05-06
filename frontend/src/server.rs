@@ -490,6 +490,7 @@ fn main() -> std::io::Result<()>{
     });
     
     let pedal_thread = thread::spawn(move || {
+	initscr();
 	loop {
 	    let b = getch();
 
