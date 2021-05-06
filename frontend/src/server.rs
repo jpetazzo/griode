@@ -375,14 +375,9 @@ fn load_instruments() -> ServerState {
     let dir = match env::var("INSTRUMENT_DIRECTORY"){
 	Ok(d) => d,
 	Err(_) => {
-	    // Environment variable not set.  Try to find it relative
-	    // to the current directory
-	    
-	    
-	    // Find the direcory with the instrument data in it.
-	    let current_dir = env::current_dir().unwrap();
-	    let dir = current_dir.parent().unwrap();
-	    dir.to_str().unwrap().to_string() + "/songs"
+	    // Environment variable not set.  We used to try to find
+	    // it relative to the current directory, bad idea.
+	    panic!("Set the INSTRUMENT_DIRECTORY environment variable")
 	},
     };
 
@@ -393,9 +388,6 @@ fn load_instruments() -> ServerState {
     // instruments in the directpry than are used.
     let list_name = format!("{}/LIST", &dir);
     
-    // Check `dir` exists and does not name a directory
-    assert!(!fs::metadata(list_name.as_str()).unwrap().file_type().is_dir());
-
     info!("list_name: {}", list_name);
 
     let mut list_d = String::new();
@@ -414,7 +406,8 @@ fn load_instruments() -> ServerState {
 		// Split line into whitspace seperated words
 		.split_whitespace()
 		
-		// Choose the next word.  If no words return "#"
+		// Choose the next word.  If no words return "#".
+		// This will force blank lines to be skipped
 		.next().unwrap_or("#")
 		
 		.bytes().next() // Get first byte
@@ -442,6 +435,7 @@ fn load_instruments() -> ServerState {
 
     for entry in dir.read_dir().expect("read_dir call failed") {
 	if let Ok(entry) = entry {
+
 	    // entry is std::fs::DirEntry
 	    let p = entry.path();
 
