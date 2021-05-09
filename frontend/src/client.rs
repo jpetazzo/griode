@@ -5,14 +5,19 @@ mod shared;
 use chrono::{Local, DateTime};
 const WS_URL: &str = "ws://patchbox.local:9000/ws";
 
-// The selected instrument is either selected or ready
+// The selected instrument is either initialising (when it has been
+// selected but before it is...)  or ready
 #[derive(PartialEq)]
 enum SelectedState {
     Initialising,
     Ready,
 }
 
-// For a selected instrument associate its state
+/// When a instrument is selected in the user interface this is
+/// initialised with the name of the instrument and
+/// `SelectedState::Initialising`.  When the server responds that the
+/// instrument is ready the state is changed to
+/// `SelectedState::Ready`.
 #[derive(PartialEq)]
 struct Selected {
     name:String,
@@ -27,6 +32,11 @@ pub struct Model {
     // There is zero or one selected instrument.  Store it with its
     // name and state.  If none selected it is None
     selected:Option<Selected>,
+
+    // The server has a pedal attached to it.  It can be in any of a
+    // number of states (three with current pedal).  The state of the
+    // pedal is expressed by a character.
+    pedal_state:char,
 
     // Count how many messages get sent.  FIXME Why?  
     sent_messages_count: usize,
@@ -46,11 +56,180 @@ fn my_now() -> String {
     return dt.to_rfc3339()
 }
 
-// The App init function. 
+
+
+pub enum Msg {
+    WebSocketOpened,
+    TextMessageReceived(shared::ServerMessage),
+    BinaryMessageReceived(shared::ServerMessage),
+    CloseWebSocket,
+    WebSocketClosed(CloseEvent),
+    WebSocketFailed,
+    ReconnectWebSocket(usize),
+    InputTextChanged(String),
+    InputBinaryChanged(String),
+    SendMessage(shared::ClientMessage),
+    SendBinaryMessage(shared::ClientMessage),
+}
+
+
+/// Create a `WebSocket` with handlers: `decode_message` called when a
+/// message is received from the server.  The other `open`, `close`,
+/// `error` handlers are simple closures returning a `Msg`
+fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
+
+    // `msg_sender` set to the function that invokes the update
+    // function
+    let msg_sender = orders.msg_sender();
+
+    WebSocket::builder(WS_URL, orders)
+        .on_open(|| Msg::WebSocketOpened)
+        .on_message(move |msg| decode_message(msg, msg_sender))
+        .on_close(Msg::WebSocketClosed)
+        .on_error(|| Msg::WebSocketFailed)
+        .build_and_open()
+        .unwrap()
+}
+
+/// Called with the msg passed and a pointer, `Rc`, to the function
+/// called when a message is received.  TODO Grok why, what that
+/// function is.  The function is called with
+/// `Option<Msg>::BinaryMessageReceived` or
+/// `Option<Msg>::TestMessageReceived`.  Why????
+fn decode_message(
+    message: WebSocketMessage,
+    msg_sender: Rc<dyn Fn(Option<Msg>)>
+){
+    if message.contains_text() {
+        let msg = message
+            .json::<shared::ServerMessage>()
+            .expect("Failed to decode WebSocket text message");
+
+        msg_sender(Some(Msg::TextMessageReceived(msg)));
+    } else {
+        spawn_local(async move {
+            let bytes = message
+                .bytes()
+                .await
+                .expect("WebsocketError on binary data");
+
+            let msg: shared::ServerMessage =
+		rmp_serde::from_slice(&bytes).unwrap();
+            msg_sender(Some(Msg::BinaryMessageReceived(msg)));
+        });
+    }
+}
+
+/// Called by `view` to generate some HTML code for a instrument.
+/// Returns the div for the instrument
+fn instrument_div(
+    instrument: String,
+    pedal_state:char,
+    height:f32, // Proportion of page
+    selected:&Option<Selected>
+) -> Node<Msg> {
+
+    // If this instrument is the selected instrument the class will be
+    // "initialising" or "selected" depending on whether the server
+    // has confirmed it is ready.  Else it is "unselected"
+    let class = match selected {
+	None =>  "unselected",
+	Some(state) => {
+	    if state.name == instrument {
+		match state.state {
+		    SelectedState::Initialising => "initialising",
+		    SelectedState::Ready => "selected",
+		}
+	    }else{
+		"unselected"
+	    }
+	},
+    };
+    
+    // For CSS height is in percent.  0 < height < 1
+    let height_div_percent = (100.0 * height).floor();
+
+    // To send to server on click.  Causes this instrument to be
+    // selected
+    let message = format!("INSTR {}", &instrument);
+
+    // HTML to return
+    div![
+	C![class],	
+        ev(
+	    Ev::Click,
+	    {
+		// log!(my_now(), my_now(), "Ev::Click Setup", instrument);
+		let instrument_clone = instrument.clone();
+		// Return the closure to execute if there is a click
+		move |_| {
+		    log!(my_now(), "Ev::Click ", instrument_clone);
+		    Msg::SendMessage(shared::ClientMessage { text: message })
+		}
+            }
+	),
+
+	// The span that contains all UI for a instrument
+	span![
+
+	    // The class of the span
+	    C!["instrument_name"],
+	    
+	    style![
+		// The whole page is 10em: ?? Is that a measurement of
+		// a particular piece of hardware, a assumtion, or a
+		// definition?
+		St::FontSize =>
+		    format!("{}em", (10.0 * height_div_percent) as f64/100.0),
+		
+		St::WordWrap => "break-word".to_string()
+	    ],
+
+	    // The text content
+	    format!("{}", &instrument),
+
+	    // Three states for a pedal
+	    span![
+		attrs![At::Width => "33%",
+		       At::Class => 
+		       if pedal_state == 'a' {
+			   "pedal-a-selected"
+		       }else{
+			   "pedal-a"
+		       },
+		],
+		"&nbsp;"
+	    ],
+	    span![
+		attrs![At::Width => "33%",
+		       At::Class => if pedal_state == 'b' {
+			   "pedal-b-selected"
+		       }else{
+			   "pedal-b"
+		       },
+		],
+		"&nbsp;"
+	    ],
+	    span![
+		attrs![At::Width => "33%",
+		       At::Class => if pedal_state == 'c' {
+			   "pedal-c-selected"
+		       }else{
+			   "pedal-c"
+		       },
+		],
+		"&nbsp;"
+	    ],
+	]
+    ]
+}
+
+/// Called by `Seed` to initialise the application..  
 fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     log!(my_now(), "Init: url: ", url);
     Model {
 	instruments: Vec::new(), 
+	pedal_state: 'a', // Arbitrary
 	selected:None,
         sent_messages_count: 0,
         messages: Vec::new(),
@@ -61,8 +240,13 @@ fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     }
 }
 
-/// Called when a message is received
-fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
+/// Called when a message is received.  Adjust state in `model` and
+/// respond to server messages
+fn update(
+    msg: Msg,
+    mut model: &mut Model,
+    orders: &mut impl Orders<Msg>
+) {
     log!(my_now(), format!("update"));
     match msg {
 
@@ -85,15 +269,18 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 
         }
 
-	// The server has sent some information
+	// The server has sent some information.
         Msg::TextMessageReceived(message) => {
             log!( my_now(), "Client received a text message",message.text);
 
-	    // FIXME This should split on new lines so instruments can
-	    // have spaces in their names.
+	    // Split the server message by white space.  The first
+	    // word is the command, it has no white space in it.  The
+	    // names of instruments cannot have white space because of
+	    // this.  It could be possible to reassemble the names
+	    // over spaces using new lines, but simpler to not allow
+	    // spaces in instrument names
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
 
-	    // The first word is the command.  
 	    match cmds[0] {
 
 		// The data needed to establisg the client state.  The
@@ -113,25 +300,37 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 			model.instruments.push(cmds[i].to_string())
 		    }			
 		},
+
+		// Pedal used on server
 		"PEDALSTATE" => {
+		    model.pedal_state = cmds[1].chars().nth(0).unwrap();
 		},
-		key => {
-		    log!(my_now(), format!("Got key: {}", &key));
+
+		// Otherwise we are getting told which instrument has
+		// been selected
+		instrument => {
+		    log!(my_now(), format!("Got instrument: {}", &instrument));
 		    model.selected = Some(
 			Selected {
-			    name:key.to_string(),
+			    name:instrument.to_string(),
 			    state: SelectedState::Ready
 			}
 		    );
 		},
 	    }
-	    
+
+	    // Why? AFAICT model::messages grows monotonically for no
+	    // purpose
             model.messages.push(message.text);
 	}
+	
+	// We do not use binary messages.  
 	Msg::BinaryMessageReceived(message) => {
             log!(my_now(), "Client received binary message");
-            model.messages.push(message.text);
+	    panic!("Binary message received: {:?}", message);
+            //model.messages.push(message.text);
 	}
+
 	Msg::CloseWebSocket => {
             log!(my_now(), "Client received CloseWebsocket");
             model.web_socket_reconnector = None;
@@ -140,6 +339,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 		.close(None, Some("user clicked Close button"))
 		.unwrap();
 	}
+
 	Msg::WebSocketClosed(close_event) => {
             log!("==================");
             log!("WebSocket connection was closed:");
@@ -155,6 +355,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 		);
             }
 	}
+
 	Msg::WebSocketFailed => {
             log!(my_now(), "WebSocket failed");
             if model.web_socket_reconnector.is_none() {
@@ -163,18 +364,22 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
 		);
             }
 	}
+
 	Msg::ReconnectWebSocket(retries) => {
             log!(my_now(), "Reconnect attempt:", retries);
             model.web_socket = create_websocket(orders);
 	}
+
 	Msg::InputTextChanged(text) => {
             log!(my_now(), "Client received InputTextChanged");
             model.input_text = text;
 	}
+
 	Msg::InputBinaryChanged(text) => {
             log!(my_now(), "Client received InputBinaryChanged");
             model.input_binary = text;
 	}
+
 	Msg::SendMessage(msg) => {
 	    // If `msg` is: "INSTR <instrument>" then we are telling
 	    // the server to select that instrument so that instrument
@@ -193,6 +398,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
             model.input_text.clear();
             model.sent_messages_count += 1;
 	}
+
 	Msg::SendBinaryMessage(msg) => {
             let serialized = rmp_serde::to_vec(&msg).unwrap();
             model.web_socket.send_bytes(&serialized).unwrap();
@@ -202,6 +408,7 @@ fn update(msg: Msg, mut model: &mut Model, orders: &mut impl Orders<Msg>) {
     }
 }
 
+/// Updates the user interface
 fn view(model: &Model) -> Vec<Node<Msg>> {
     
     // `body` is a convenience function to access the web_sys DOM
@@ -219,6 +426,7 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
 	    ret.push(
 		instrument_div(
 		    i.clone(),
+		    model.pedal_state,
 		    1.0_f32/model.instruments.len() as f32,
 		    &model.selected,
 		)
@@ -230,125 +438,15 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     ret
 }
 
-pub enum Msg {
-    WebSocketOpened,
-    TextMessageReceived(shared::ServerMessage),
-    BinaryMessageReceived(shared::ServerMessage),
-    CloseWebSocket,
-    WebSocketClosed(CloseEvent),
-    WebSocketFailed,
-    ReconnectWebSocket(usize),
-    InputTextChanged(String),
-    InputBinaryChanged(String),
-    SendMessage(shared::ClientMessage),
-    SendBinaryMessage(shared::ClientMessage),
-}
-
-fn create_websocket(orders: &impl Orders<Msg>) -> WebSocket {
-    let msg_sender = orders.msg_sender();
-
-    WebSocket::builder(WS_URL, orders)
-        .on_open(|| Msg::WebSocketOpened)
-        .on_message(move |msg| decode_message(msg, msg_sender))
-        .on_close(Msg::WebSocketClosed)
-        .on_error(|| Msg::WebSocketFailed)
-        .build_and_open()
-        .unwrap()
-}
-
-fn decode_message(message: WebSocketMessage, msg_sender: Rc<dyn Fn(Option<Msg>)>) {
-    if message.contains_text() {
-        let msg = message
-            .json::<shared::ServerMessage>()
-            .expect("Failed to decode WebSocket text message");
-
-        msg_sender(Some(Msg::TextMessageReceived(msg)));
-    } else {
-        spawn_local(async move {
-            let bytes = message
-                .bytes()
-                .await
-                .expect("WebsocketError on binary data");
-
-            let msg: shared::ServerMessage = rmp_serde::from_slice(&bytes).unwrap();
-            msg_sender(Some(Msg::BinaryMessageReceived(msg)));
-        });
-    }
-}
-
-// ------ ------
-//     View
-// ------ ------
-
-
-fn instrument_div(instrument: String,
-	    height:f32, // Proportion of page
-	    selected:&Option<Selected>) -> Node<Msg> {
-
-    // log!(my_now(), format!("{} instrument_div({})", my_now(), instrument));
-
-    let class = match selected {
-	None =>  "unselected",
-	Some(state) => {
-	    if state.name == instrument {
-		match state.state {
-		    SelectedState::Initialising => "initialising",
-		    SelectedState::Ready => "selected",
-		}
-	    }else{
-		"unselected"
-	    }
-	},
-    };
-    
-    // For CSS height is in percent.  
-    let height_div_percent = (100.0 * height).floor();
-
-    // To send on click
-    let message = format!("INSTR {}", &instrument);
-    
-    div![
-	//
-	attrs![
-	    At::Height => percent(33),
-	    At::Class => class,
-	],
-	style![
-	    St::Width => "100%",
-	    St::Height => format!("{}%", height_div_percent).as_str(),
-	    St::Display => "block",
-	    St::Border => "1px solid red",
-	    St::TextAlign => "center",
-	],
-        ev(
-	    Ev::Click,
-	    {
-		// log!(my_now(), my_now(), "Ev::Click Setup", instrument);
-		let instrument_clone = instrument.clone();
-		// Return the closure to execute if there is a click
-		move |_| {
-		    log!(my_now(), "Ev::Click ", instrument_clone);		    
-		    Msg::SendMessage(shared::ClientMessage { text: message })
-		}
-            }
-	),
-	span![
-	    C!["instrument_name"],
-	    style![
-		// The whole page is 10em
-		St::FontSize => format!("{}em", (10.0 * height_div_percent) as f64/100.0),
-		St::WordWrap => "break-word".to_string()
-	    ],
-	    format!("{}", &instrument),
-	],
-    ]
-}
-
-// ------ ------
-//     Start
-// ------ ------
-
 #[wasm_bindgen(start)]
 pub fn start() {
-    App::start("app", init, update, view);
+    App::start(
+	// The generated HTML will attach itself to a <section
+	// id=<section id="app"> Unsure if it needs to be a section...
+	"app",
+
+	// Functions for running the application.  `init` is run once
+	// at initialisation, `update` is called when a message
+	// received and `view` is called to update the HTML5 UI
+	init, update, view);
 }
