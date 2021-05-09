@@ -1,9 +1,11 @@
 body,html,#app {
     height: 100%
 }
+
 .selected {
     background: aliceblue;
 }
+
 .initialising {
   animation-name: backgroundColorPalette;
   animation-duration: 1.5s;
@@ -12,10 +14,65 @@ body,html,#app {
   transition: background-color 1s;
   background: #7fc19f;
 }
+
+.instrument {
+    width: 100%;
+    height: 50%;
+    Display: block;
+    Border: 1px solid red;
+    text-align: center;
+}
+
+
 .unselected {
     background: #655811;
 }
 
+.instrument-name{
+    border: 1px solid red;
+    display: block;
+    font-size: 5em;
+    height: 50%;
+    text-align: center;
+    width: 100%;
+    word-wrap: break-word;
+}
+
+.pedal-a {
+    left: 0;
+    background: background: #6ebf252b;
+}
+
+.pedal-a-selected  {
+    left: 0;
+    background:#6ebf25c9;
+}
+
+.pedal-b {
+    left: 33.333%;
+    background: #aa27271c;
+}
+
+.pedal-b-selected {
+    left: 33.333%;
+    background: #aa2727bf;
+}
+
+.pedal-c {
+    left: 66.667%;
+    background:#493ab40f;
+}
+
+.pedal-c-selected {
+    left: 66.667%;
+    background:#493ab4d4;
+}
+.pedal {
+    width: 33%;
+    border: 1px solid blue;
+    display: inline-block;
+    position: absolute;
+}
 
 /*
   https://techstacker.com/how-to-loop-background-color-animation-css/
