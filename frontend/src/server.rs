@@ -195,7 +195,7 @@ impl MyFactoryServer {
 			    break;
 			}
 		    };
-
+		    set_pedal(state.state);
 		    for tx in &*arc_txs.lock().unwrap() {
 		        match tx.send(state) {
 			    Ok(x) => println!("FactoryServer sent: {:?}", x),
@@ -327,19 +327,24 @@ impl ws::Handler for MyHandlerServer {
     }
 }
 
+fn set_pedal(p:char){
+    panic!("Unimplemented");
+}
 fn set_instrument(file_path:&str) {
 
 
     info!("set_instrument: file_path {}", file_path);
 
-    let exec_name = format!(
-	"{}/control",
-	// Why the parent of the current directory?  FIXME This is
-	// obscure
-	env::current_dir().unwrap()
-	    .parent().unwrap()
-	    .to_str().unwrap()
-    );    
+    let dir = match env::var("PATH_MI_ROOT"){
+	Ok(d) => d,
+	Err(_) => {
+	    // Environment variable not set.  We used to try to find
+	    // it relative to the current directory, bad idea.
+	    panic!("Set the PATH_MI_ROOT environment variable")
+	},
+    };
+
+    let exec_name = format!("{}/control", dir);
 
     let cmd = format!("{} {}", exec_name, file_path);
     let mut child = Command::new(exec_name.as_str())
@@ -372,12 +377,12 @@ fn load_instruments() -> ServerState {
     // that will be presented to the user.
 
     // First find the directory:
-    let dir = match env::var("INSTRUMENT_DIRECTORY"){
-	Ok(d) => d,
+    let dir = match env::var("PATH_MI_ROOT"){
+	Ok(d) => format!("{}/songs", d),
 	Err(_) => {
 	    // Environment variable not set.  We used to try to find
 	    // it relative to the current directory, bad idea.
-	    panic!("Set the INSTRUMENT_DIRECTORY environment variable")
+	    panic!("Set the PATH_MI_ROOT environment variable")
 	},
     };
 
@@ -468,6 +473,7 @@ fn load_instruments() -> ServerState {
 }
 
 fn main() -> std::io::Result<()>{
+
     // Listen on an address and call the closure for each connection
     SimpleLogger::new().init().unwrap();
     info!("Starting server");
