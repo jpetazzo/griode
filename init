@@ -7,37 +7,38 @@ my $FE_PID_FILE = "$ROOT/.griode.pid";
 my $WS_PID_FILE = "$ROOT/.griode.pid";
 my $LV2_PATH = "$ROOT/lv2/plugins";
 
+## Logging levels: DEBUG, INFO, WARNING, ERROR, and CRITICAL
 my $GRIODE_CMD = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
-    " $ROOT/griode.py 2>&1 |tee /tmp/griode.log";
-
+    " $ROOT/griode.py 2>&1 > /tmp/griode.log";
 
 # mod-host runs lv2 plugins
-my $MOD_HOST='/home/patch/mod-host/bin/mod-host';
--e $MOD_HOST or die $!;
+my $MOD_HOST_EXE='/home/patch/mod-host/bin/mod-host';
+-e $MOD_HOST_EXE or die $!;
+my $mod_host_cmd = "LV2_PATH=$LV2_PATH $MOD_HOST_EXE";
 
-# Check if mod-host is running if not run it
-my @psx = `ps x`;
-my  $mod_host_running = grep{/mod-host/} @psx;
+my  $mod_host_running = grep{/$MOD_HOST_EXE/} `ps xww`;
 if(!$mod_host_running){
     # Need to start mod-host
-
-    my $cmd = "LV2_PATH=$LV2_PATH $MOD_HOST";
-    print "Run: $cmd\n";
+    
+    print "Run: $mod_host_cmd\n";
 
     my $p = fork();
     if($p == 0) {
 	# Child
-	`$cmd`;
+	`$mod_host_cmd`;
 	exit;
     }else{
-	print "Forked mod-host\n";
+	print "Started mod-host\n";
     }
+}else{
+    print "mod-host already running\n";
 }
 
 # Check if jack running
 my $res =`jack_wait -c 2>/dev/null`;
 chomp $res;
 $res eq "running" or die "Jack is not running\n";
+print "jack running\n";
 
 # Check griode is running
 my $running = 0;
@@ -46,6 +47,7 @@ if(-e  $GRIODE_PID_FILE){
     $running = grep{/^$pid\s/} `ps x`;
 }
 
+## If it is not running, start it
 if(!$running){
     my $pid = fork();
     defined($pid) or die "$!: Cannot fork";
@@ -55,6 +57,8 @@ if(!$running){
     }else{
 	print "Ran $GRIODE_CMD\n";
     }
+}else{
+    print "Griode running: Do not start it\n";
 }
 
 sub run_fe {
