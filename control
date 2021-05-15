@@ -105,8 +105,6 @@ sub consume_stdin() {
 # programme
 
 
-
-
 # The mod-host works having a set of "effects".  Each one is added
 # with the command:
 
@@ -144,14 +142,13 @@ if(scalar(@ARGV) == 0){
 }
 #print join("\n", @stdin)."\n---\n";
 
-
 # Place tostore commands before being executed.
 my @griode = ();
 my @modhost = ();
 my @jack = ();
 
 
-# Commands on comand line.
+# Commands on command line.
 # `mh`  a mod host parameter to set
 # Else a file name that holds commannds to initialise a instrument
 
@@ -180,9 +177,6 @@ foreach my $line (@stdin){
     }elsif($arg1 eq 'clear'){
 	# If there is no history there is nothing to clear
 	my $s = -s $history_fn;
-	# if($s == 0){
-	#     next;
-	# }
 	if($s > 0){
 	    # Read history and undo commands run earlier and undo them
 	    my @history = `cat $history_fn`;
