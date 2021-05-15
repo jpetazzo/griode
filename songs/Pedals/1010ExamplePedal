@@ -1,0 +1,25 @@
+
+
+mh add http://avwlv2.sourceforge.net/plugins/avw/ad 1012
+
+
+
+mh add http://guitarix.sourceforge.net/plugins/gxechocat#echocat 1013
+mh param_set 1013 drive 0.5
+
+# min/max 0/1  Amount of signal in echo
+mh param_set 1013 swell 1
+
+mh param_set 1013 sustain 0.5
+mh param_set 1013 bpm 240
+mh param_set 1013 head1 .1
+mh param_set 1013 head2 0.05
+mh param_set 1013 head3 0.025
+
+jack MI_IN1 effect_1012:cvin
+jack MI_IN2 effect_1012:cvin
+jack effect_1012:cvout0 effect_1013:in
+jack effect_1013:out MI_OUT1
+jack effect_1013:out MI_OUT2
+
+
