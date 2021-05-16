@@ -10,14 +10,6 @@ use File::Spec;
 my $mod_host_port = 5555;
 my $griode_port = 8887;
 
-# Translation table for jack ports.  The names in the jack input lines
-# are looked up in this hash.
-my %JACK_PORTS = (
-    MI_IN1 => 'system:capture_1',
-    MI_IN2 => 'system:capture_2',
-    MI_OUT1 => 'system:playback_1',
-    MI_OUT2 => 'system:playback_2'
-    );
 
 # The history file keeps track of what changes this has made to jack
 # and mod-host that have to be undone next run.  FIXME The history
@@ -268,10 +260,6 @@ if(@modhost){
 if(@jack){
     # warn "jack\n";
     foreach my $cmd (@jack){
-	foreach my $lhs (keys %JACK_PORTS){
-	    my $rhs = $JACK_PORTS{$lhs};
-	    $cmd =~ s/$lhs/$rhs/g;
-	}
 	## Could use mod_host here.  May be quicker....
 	`jack_connect $cmd`;
 	write_history(('jack '.$cmd));
