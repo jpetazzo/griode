@@ -24,8 +24,6 @@ mh param_set 3 output .5
 
 mh add http://drobilla.net/plugins/mda/Bandisto 4
 
-# Looper
-mh add http://moddevices.com/plugins/sooperlooper 5
 
 
 # Effects for guitar/voice
@@ -44,11 +42,11 @@ jack effect_1:output effect_2:right_in
 jack effect_2:left_out effect_3:left_in
 jack effect_2:right_out effect_3:right_in
 
-# jack effect_3:left_out effect_5:input
-# jack effect_3:right_out effect_5:input
 
 jack effect_3:output MI_OUT1
 jack effect_3:output MI_OUT2
 
-
+pedal A 1000ExamplePedal
+pedal B 1010ExamplePedal
+pedal C 1020ExamplePedal
 
