@@ -1,4 +1,4 @@
-#!/bin/erl -w
+#!/bin/perl -w
 use strict;
 my $ROOT =  $ENV{PATH_MI_ROOT};
 -d $ROOT or die "'$ROOT' is not a directory:";
