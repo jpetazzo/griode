@@ -38,8 +38,8 @@ mh add http://drobilla.net/plugins/mda/Leslie 4
 mh param_set 4 speed .1
 
 # jack effect_1:output effect_2:input
-# jack effect_1:output MI_OUT1
-# jack effect_1:output MI_OUT2
+# jack effect_1:output system:playback_1
+# jack effect_1:output system:playback_2
 # jack fluidsynth:left effect_1:input
 # jack fluidsynth:right effect_1:input
 
@@ -49,7 +49,7 @@ jack effect_1:output effect_2:in
 jack effect_2:out effect_3:in
 jack effect_3:out effect_4:left_in
 jack effect_3:out effect_4:right_in
-jack effect_4:left_out MI_OUT1
-jack effect_4:right_out MI_OUT2
+jack effect_4:left_out system:playback_1
+jack effect_4:right_out system:playback_2
 
 

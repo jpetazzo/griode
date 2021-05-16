@@ -27,8 +27,8 @@ mh add http://drobilla.net/plugins/mda/Bandisto 4
 
 
 # Effects for guitar/voice
-jack MI_IN1  effect_4:left_in
-jack MI_IN2  effect_4:right_in
+jack system:capture_1  effect_4:left_in
+jack system:capture_2  effect_4:right_in
 jack effect_4:left_out MI_OUT1
 jack effect_4:right_out MI_OUT2
 

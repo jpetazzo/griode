@@ -16,10 +16,10 @@ mh param_set 1013 head1 .1
 mh param_set 1013 head2 0.05
 mh param_set 1013 head3 0.025
 
-jack MI_IN1 effect_1012:cvin
-jack MI_IN2 effect_1012:cvin
+jack system:capture_1 effect_1012:cvin
+jack system:capture_2 effect_1012:cvin
 jack effect_1012:cvout0 effect_1013:in
-jack effect_1013:out MI_OUT1
-jack effect_1013:out MI_OUT2
+jack effect_1013:out system:playback_1
+jack effect_1013:out system:playback_2
 
 

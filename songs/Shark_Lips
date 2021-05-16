@@ -31,7 +31,7 @@ mh param_set 3 head3 0.025
 
 jack effect_1:out effect_2:in
 jack effect_2:out effect_3:in
-jack effect_3:out MI_OUT1
-jack effect_3:out MI_OUT2
+jack effect_3:out system:playback_1
+jack effect_3:out system:playback_2
 jack fluidsynth:left effect_1:in
 jack fluidsynth:right effect_1:in
