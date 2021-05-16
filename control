@@ -23,9 +23,12 @@ my %JACK_PORTS = (
 # and mod-host that have to be undone next run.  FIXME The history
 # file is in a bad place.  Should not be able to write to the
 # directory the script is in
-my $pwd = `pwd`;
-chomp $pwd;
-my $DIR = $0;
+
+## FIXME Use environment variable here.
+my $ROOT =  $ENV{PATH_MI_ROOT};
+-d $ROOT or die "'$ROOT' is not a directory:";
+
+my $DIR = $ROOT;
 $DIR =~ s/\/[^\/]+$/\//;
 my $history_fn = "$DIR.history";
 warn "History is: $history_fn";
@@ -41,6 +44,15 @@ sub meter_bridge {
 	kill 'HUP' , $pid;
     }
     
+}
+
+## Called when a `pedal...` command received
+sub pedal( $ ) {
+    my $pedal = shift or die;
+
+    ## `$pedal` is a character in 'A', 'B', 'C'.  A choice of three
+    ## pedals.
+    -l 
 }
 
 sub mod_host( $ ){
@@ -69,6 +81,40 @@ sub mod_host( $ ){
 	    $result .=  $res;
 	}
 	if($result =~ /resp ([\-0-9]+)/){
+	    # If status is a negative number an error has
+	    # occurred. The table below shows the number of each
+	    # error.
+	    
+	    # status 	error
+	    # -1 	ERR_INSTANCE_INVALID
+	    # -2 	ERR_INSTANCE_ALREADY_EXISTS
+	    # -3 	ERR_INSTANCE_NON_EXISTS
+	    # -4 	ERR_INSTANCE_UNLICENSED
+	    # -101 	ERR_LV2_INVALID_URI
+	    # -102 	ERR_LV2_INSTANTIATION
+	    # -103 	ERR_LV2_INVALID_PARAM_SYMBOL
+	    # -104 	ERR_LV2_INVALID_PRESET_URI
+	    # -105 	ERR_LV2_CANT_LOAD_STATE
+	    # -201 	ERR_JACK_CLIENT_CREATION
+	    # -202 	ERR_JACK_CLIENT_ACTIVATION
+	    # -203 	ERR_JACK_CLIENT_DEACTIVATION
+	    # -204 	ERR_JACK_PORT_REGISTER
+	    # -205 	ERR_JACK_PORT_CONNECTION
+	    # -206 	ERR_JACK_PORT_DISCONNECTION
+	    # -301 	ERR_ASSIGNMENT_ALREADY_EXISTS
+	    # -302 	ERR_ASSIGNMENT_INVALID_OP
+	    # -303 	ERR_ASSIGNMENT_LIST_FULL
+	    # -304 	ERR_ASSIGNMENT_FAILED
+	    # -401 	ERR_CONTROL_CHAIN_UNAVAILABLE
+	    # -402 	ERR_LINK_UNAVAILABLE
+	    # -901 	ERR_MEMORY_ALLOCATION
+	    # -902 	ERR_INVALID_OPERATION
+
+	    #     A status zero or positive means that the command was
+	    #     executed successfully. In case of the add command,
+	    #     the status returned is the instance number. The
+	    #     value field currently only exists for the param_get
+	    #     command.
 	    if($1 < 0){
 		warn ">> $cmd >>  $result";
 	    }
@@ -226,6 +272,7 @@ if(@jack){
 	    my $rhs = $JACK_PORTS{$lhs};
 	    $cmd =~ s/$lhs/$rhs/g;
 	}
+	## Could use mod_host here.  May be quicker....
 	`jack_connect $cmd`;
 	write_history(('jack '.$cmd));
     }
