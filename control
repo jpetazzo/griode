@@ -11,25 +11,57 @@ my $mod_host_port = 5555;
 my $griode_port = 8887;
 
 
-# The history file keeps track of what changes this has made to jack
-# and mod-host that have to be undone next run.  FIXME The history
-# file is in a bad place.  Should not be able to write to the
-# directory the script is in
-
-## FIXME Use environment variable here.
+## Root directory of the system
 my $ROOT =  $ENV{PATH_MI_ROOT};
 -d $ROOT or die "'$ROOT' is not a directory:";
+$ROOT =~ s/^\s*//; ## Clean white space from start
+$ROOT =~ s/\s*$//; ## Clean white space from end
+$ROOT =~ /\/$/ or $ROOT .= '/'; ## Ensure ends with a '/'
 
-my $DIR = $ROOT;
-$DIR =~ s/\/[^\/]+$/\//;
-my $history_fn = "$DIR.history";
+# The history file keeps track of what changes this has made to jack
+# that have to be undone next run and mod-host and the state file
+# keeps track of (at least) the pedal state.  FIXME The history and
+# state files is in a bad place.  Should not be able to write to the
+# directory the script is in
+
+my $history_fn = "$ROOT.history";
 warn "History is: $history_fn";
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
 
+my $state_fn = "$ROOT.state";
+warn "State is: $state_fn";
+-e $state_fn or `touch $state_fn`;
+-r $state_fn or die "$!: Cannot read $state_fn ";
+-w $state_fn or die "$!: Cannot read $state_fn ";
+
+
+my %state = (); # Global!
+sub getState() {
+    %state = ();
+    open(my $in, $state_fn) or die "$!: Cannot read $state_fn";
+    my $ln = 0;
+    while(my $kv = <$in>){
+	$ln++;
+	chomp $kv;
+	$kv =~ /^([^\t]+)\t(.+)$/ or die "Line $ln $state_fn: '$kv' invalid";
+	$state{$1} = $2;
+    }
+    return %state;
+}
+
+sub saveState( $ ) {
+    my $state_ref = shift or die;
+    my %state = %$state_ref or die;
+    open(my $out, ">$state_fn") or die "$!: Cannot rewrite $state_fn";
+    foreach my $key (sort keys (%state)){
+	print $out "$key\t$state{$key}\n";
+    }
+}
+
 sub meter_bridge {
-    my $pid_fn = "$DIR.meter_bridge.pid";
+    my $pid_fn = "$ROOT.meter_bridge.pid";
     if(-e $pid_fn){
 	my $pid = `cat $pid_fn`;
 	chomp $pid;
@@ -44,7 +76,11 @@ sub pedal( $ ) {
 
     ## `$pedal` is a character in 'A', 'B', 'C'.  A choice of three
     ## pedals.
-    -l 
+    -l "$ROOT/songs/Pedals/$pedal" or die "Cannot use pedal $pedal";
+    
+}
+
+sub setup_pedal( $ ) {
 }
 
 sub mod_host( $ ){
@@ -171,26 +207,32 @@ sub consume_stdin() {
 my @stdin;
 if(scalar(@ARGV) == 0){
     # No argument.  Read stdin
-    
     @stdin = consume_stdin();
 }elsif(scalar(@ARGV) == 1){
     # One arg, a path
     open(my $in, $ARGV[0]) or die "$!: $ARGV[0]";
     @stdin = <$in>;
 }
+
+# Get the state
+%state = &getState();
+
 #print join("\n", @stdin)."\n---\n";
 
 # Place tostore commands before being executed.
 my @griode = ();
 my @modhost = ();
 my @jack = ();
-
+my @pedals = ();
 
 # Commands on command line.
 # `mh`  a mod host parameter to set
 # Else a file name that holds commannds to initialise a instrument
-
+my $ln = 0;
 foreach my $line (@stdin){
+    $ln++;
+    
+    ## Skip comments and blank lines
     $line =~ /\S/ or next;
     $line =~ /^\s*\#/ and next;
     chomp $line;
@@ -237,8 +279,10 @@ foreach my $line (@stdin){
 
 	    unlink $history_fn;
 	}
+    }elsif($arg1 eq 'pedal'){
+	push(@pedals, $args);
     }else{
-	die $arg1;
+	die "Do not understand line $ln: '$line'"
     }
 }
 
@@ -252,18 +296,21 @@ if(@griode){
 }
 if(@modhost){
     # print "mod-host\n";
-    my $start  = time();
     mod_host(\@modhost);
-    # print "mod-host: ".(time() - $start) . " seconds\n";
     write_history(map{'mod-host '. $_} @modhost);
 }
 if(@jack){
     # warn "jack\n";
     foreach my $cmd (@jack){
-	## Could use mod_host here.  May be quicker....
+	## Use mod_host here.  Much quicker
 	`jack_connect $cmd`;
 	write_history(('jack '.$cmd));
     }
 }
-
+if(@pedals){
+    foreach my $pedal (@pedals){
+	setup_pedal($pedal);
+    }
+}
 ## 
+&saveState(\%state);
