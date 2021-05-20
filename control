@@ -4,6 +4,10 @@ use IPC::Open2;
 use Fcntl;
 use Symbol 'gensym'; # vivify a separate handle for STDERR
 use File::Spec;
+use Data::Dumper;
+$Data::Dumper::Indent = 1;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Purity = 1;
 
 # Communication with other programmes.  `mod_host` handles LV2
 # effects.  `griode` runs the Launchpad X controller.
@@ -25,28 +29,27 @@ $ROOT =~ /\/$/ or $ROOT .= '/'; ## Ensure ends with a '/'
 # directory the script is in
 
 my $history_fn = "$ROOT.history";
-warn "History is: $history_fn";
+
 -e $history_fn or `touch $history_fn`;
 -r $history_fn or die "$!: Cannot read $history_fn ";
 -w $history_fn or die "$!: Cannot read $history_fn ";
 
 my $state_fn = "$ROOT.state";
-warn "State is: $state_fn";
+
 -e $state_fn or `touch $state_fn`;
 -r $state_fn or die "$!: Cannot read $state_fn ";
 -w $state_fn or die "$!: Cannot read $state_fn ";
 
 
 my %state = (); # Global!
+
 sub getState() {
-    %state = ();
     open(my $in, $state_fn) or die "$!: Cannot read $state_fn";
-    my $ln = 0;
-    while(my $kv = <$in>){
-	$ln++;
-	chomp $kv;
-	$kv =~ /^([^\t]+)\t(.+)$/ or die "Line $ln $state_fn: '$kv' invalid";
-	$state{$1} = $2;
+    my $state_text = join('', <$in>);
+    {
+	no strict;
+	my $state_ref = eval $state_text;
+	%state = %$state_ref;
     }
     return %state;
 }
@@ -55,9 +58,10 @@ sub saveState( $ ) {
     my $state_ref = shift or die;
     my %state = %$state_ref or die;
     open(my $out, ">$state_fn") or die "$!: Cannot rewrite $state_fn";
-    foreach my $key (sort keys (%state)){
-	print $out "$key\t$state{$key}\n";
-    }
+    print $out Data::Dumper->Dump([\%state], ['state']);
+    # foreach my $key (sort keys (%state)){
+    # 	print $out "$key\t$state{$key}\n";
+    # }
 }
 
 sub meter_bridge {
@@ -67,7 +71,6 @@ sub meter_bridge {
 	chomp $pid;
 	kill 'HUP' , $pid;
     }
-    
 }
 
 ## Called when a `pedal...` command received
@@ -81,6 +84,53 @@ sub pedal( $ ) {
 }
 
 sub setup_pedal( $ ) {
+    ## Like 'A 1010Pedal' Where A' names the pedal and
+    ## songs/Pedals/1010Pedal defines the effects
+    
+    my $name_file = shift or die;
+    $name_file =~ /^(\S)\s(\S+)$/ or die "\$name_file $name_file";
+
+    my $pedal = $1;
+
+    my $file = $ROOT . "songs/Pedals/$2";
+    -r $file or die "$!: '$file'";
+
+    # Make the state entry for the pedal if it does not exist
+    exists $state{$pedal} or $state{$pedal} = {};
+    
+    ## Pedals are only allowed to effect mod-host and jack
+    my @mod_host = ();
+    my @jack = ();
+
+    ## Read file and make the connections.  This is a duplicate of
+    ## other code in this programme
+    my $ln = 0;
+    open(my $in, $file) or die "$!: Cannot open '$file'";
+    while(my $line = <$in>){
+	$ln++;
+	chomp $line;
+
+	## Skip blank lines and comments
+	$line =~ /^\s*$/ and next;
+	$line =~ /^\s*\#/ and next;
+
+	$line =~ /^(\S+)\s+(.+)\s*$/ or
+	    die "Line $ln of file '$file' has line ".
+	    "'$line' that is not understood";
+	my $t = $1;
+	my $c = $2;
+	if($t eq 'mh'){
+	    push(@mod_host, $c);
+	}elsif($c eq 'jack'){
+
+	    ## Treat system:capture_N connections differently.  This
+	    ## is so switching pedals is simply a matter of
+	    ## reconnecting system:capture_N
+	}else{
+	    die "Do not understand pedal command '$c' from '$file' line $ln";
+	}
+	
+    }
 }
 
 sub mod_host( $ ){
@@ -217,6 +267,17 @@ if(scalar(@ARGV) == 0){
 # Get the state
 %state = &getState();
 
+$state{"ran"} = scalar(localtime(time()));
+
+# Proof of concept for saving state
+# $state{"Pedals"} = {};
+# $state{"Pedals"}->{A} = {};
+# $state{"Pedals"}->{A}->{capture} = [];
+# push(@{$state{"Pedals"}->{A}->{capture}},
+#      ["system:capture_1 ", "effect_1002:in"]);
+# push(@{$state{"Pedals"}->{A}->{capture}},
+#      ["system:capture_2 ", "effect_1002:in"]);
+
 #print join("\n", @stdin)."\n---\n";
 
 # Place tostore commands before being executed.
@@ -312,5 +373,6 @@ if(@pedals){
 	setup_pedal($pedal);
     }
 }
-## 
+##
+
 &saveState(\%state);
