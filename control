@@ -14,6 +14,12 @@ $Data::Dumper::Purity = 1;
 my $mod_host_port = 5555;
 my $griode_port = 8887;
 
+## Pedals.  This defines what pedals there are.  Each pedal is named
+## by a single character, and has a section in %state.  Pedals are
+## devices attached to the server that get set up by "song" files
+## (FIXME "song" is wrong word.)  and when they signal the server it
+## swaps inputs around.
+my @PEDALS = ('A', 'B', 'C'); ## Three pedals currently
 
 ## Root directory of the system
 my $ROOT =  $ENV{PATH_MI_ROOT};
@@ -51,6 +57,16 @@ sub getState() {
 	my $state_ref = eval $state_text;
 	%state = %$state_ref;
     }
+    ## Check for pedals
+    defined($state{'pedals'}) or $state{'pedals'} = {};
+    foreach my $pedal (@PEDALS){
+	defined $state{'pedals'}->{$pedal} and next;
+	$state{'pedals'}->{$pedal} = {'capture' => []};
+    }
+
+    ## Check stdin state initialised
+    defined($state{'capture'}) or $state{'capture'} = [];
+    
     return %state;
 }
 
@@ -77,10 +93,32 @@ sub meter_bridge {
 sub pedal( $ ) {
     my $pedal = shift or die;
 
-    ## `$pedal` is a character in 'A', 'B', 'C'.  A choice of three
-    ## pedals.
-    -l "$ROOT/songs/Pedals/$pedal" or die "Cannot use pedal $pedal";
+    defined($state{'pedals'}->{$pedal}) or die "No pedal '$pedal' in state";
+
+    ## Enable a pedal by connecting the "system:capture_N" connections
+    ## in Jack, and disable the existing pedal (if there is one)
+    ## similarly.  Collect the connection/disconnection commands here
+    my @capture_cmds = ();
     
+    ## The disconnection commands go first.  Need to check, it may be
+    ## better to do these last to avoid audible effects... Need to
+    ## experiment
+    foreach my $capture (@{$state{'capture'}}){
+	push(@capture_cmds, "disconnect $capture");
+    }    
+    $state{'capture'} = [];
+
+    ## Collect the connections to turn on the new command
+    foreach my $capture (@{$state{"pedals"}->{$pedal} }){
+	scalar(@$capture) == 2 or die "Invalid state for pedal '$pedal'";
+	my $connection = "$capture->[0] $capture->[1]";
+	push(@capture_cmds, "connect $connection");
+	push(@{$state{'capture'}}, $connection);
+    }
+
+    ## Use mod_host to adust the connections.  Much faster than
+    ## `jack_connect` and `jack_disconnet`
+    mod_host(\@capture_cmds);
 }
 
 sub setup_pedal( $ ) {
@@ -96,7 +134,7 @@ sub setup_pedal( $ ) {
     -r $file or die "$!: '$file'";
 
     # Make the state entry for the pedal if it does not exist
-    exists $state{$pedal} or $state{$pedal} = {};
+    exists $state{'pedals'}->{$pedal} or die "Pedal: '$pedal' not in state";
     
     ## Pedals are only allowed to effect mod-host and jack
     my @mod_host = ();
@@ -270,12 +308,12 @@ if(scalar(@ARGV) == 0){
 $state{"ran"} = scalar(localtime(time()));
 
 # Proof of concept for saving state
-# $state{"Pedals"} = {};
-# $state{"Pedals"}->{A} = {};
-# $state{"Pedals"}->{A}->{capture} = [];
-# push(@{$state{"Pedals"}->{A}->{capture}},
+# $state{"pedals"} = {};
+# $state{"pedals"}->{A} = {};
+# $state{"pedals"}->{A}->{capture} = [];
+# push(@{$state{"pedals"}->{A}->{capture}},
 #      ["system:capture_1 ", "effect_1002:in"]);
-# push(@{$state{"Pedals"}->{A}->{capture}},
+# push(@{$state{"pedals"}->{A}->{capture}},
 #      ["system:capture_2 ", "effect_1002:in"]);
 
 #print join("\n", @stdin)."\n---\n";
