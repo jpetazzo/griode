@@ -1,5 +1,10 @@
+#[macro_use] extern crate log;
+
 extern crate ncurses;
+extern crate simplelog;
+use log::{info}; //, trace, warn};
 use ncurses::*;
+use simplelog::*;
 use std::collections::HashMap;
 use std::env;
 use std::fs::File;
@@ -12,9 +17,6 @@ use std::sync::Mutex;
 use std::sync::mpsc;
 use std::thread;
 use std::time;
-
-use log::{info}; //, trace, warn};
-use simple_logger::SimpleLogger;
 
 // https://docs.rs/ws/
 use ws;
@@ -328,7 +330,7 @@ impl ws::Handler for MyHandlerServer {
 }
 
 fn set_pedal(p:char){
-    panic!("Unimplemented");
+    info!("Unimplemented pedal {}", p);
 }
 fn set_instrument(file_path:&str) {
 
@@ -475,7 +477,16 @@ fn load_instruments() -> ServerState {
 fn main() -> std::io::Result<()>{
 
     // Listen on an address and call the closure for each connection
-    SimpleLogger::new().init().unwrap();
+    CombinedLogger::init(
+        vec![	    
+            WriteLogger::new(LevelFilter::Warn,
+			     Config::default(),
+			     File::create("server.log").unwrap()),
+            WriteLogger::new(LevelFilter::Info,
+			     Config::default(),
+			     File::create("server.log").unwrap()),
+        ]
+    ).unwrap();
     info!("Starting server");
 
     // Create channel to communicate with the server.  
