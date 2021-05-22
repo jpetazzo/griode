@@ -1,7 +1,9 @@
-#[macro_use] extern crate log;
+// #[macro_use]
+extern crate log;
 
 extern crate ncurses;
 extern crate simplelog;
+
 use log::{info}; //, trace, warn};
 use ncurses::*;
 use simplelog::*;
@@ -10,14 +12,15 @@ use std::env;
 use std::fs::File;
 use std::fs;
 use std::io::Read;
+use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
+use std::process:: Stdio;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc;
 use std::thread;
 use std::time;
-
 // https://docs.rs/ws/
 use ws;
 // use ws::{listen, CloseCode, Handler, Message, Request, Response,
@@ -66,20 +69,38 @@ impl ServerState {
     }  
 }
 
-struct MyFactoryServer{
+/// Web Socket Server code: Two main classes: WSFactory, and
+/// WSHandler.  The WSFactory is (efectively) a singleton.  It runs
+/// the code that listens on the socked for client connections (see
+/// `client.rs`) and for each connection it builds a WSHandler.
+
+/// There is two way communication between the server and the clients.
+/// The clients issue commands to change the "song" file (FIXME
+/// Terrible name) being read, the server arranges for it to change
+/// then it notifies the clients about the new settings.
+
+/// The server also listens to a "pedal".  It sends single character
+/// commands fro ma limited set of characters to say which pedals are
+/// depressed.  Then the server aranges for quick (<10ms ideally)
+/// changes in audio routing from the STDIN, then notifies the clients
+/// so they can display the state to the person using the system.
+/// This is to operate real time changes in the effect chain.
+/// Currently only from STDIN so for guitar efects....
+
+struct WSFactory{
     
     // A transmitter for each `Handle` so changes in state can be
-    // propagated to the `MyHandlerServer` objects, and thus to the
+    // propagated to the `WSHandler` objects, and thus to the
     // clients
     txs:Arc<Mutex<Vec<mpsc::Sender<PedalState>>>>,
 
     // The state of the server.  It is shared state, shared with the
-    // `MyHandlerServer` objects.  They can change it
+    // `WSHandler` objects.  They can change it
     server_state:Arc<Mutex<ServerState>>,
 
 }
 
-struct MyHandlerServer{
+struct WSHandler{
 
     // For communicating with clients
     out:ws::Sender,
@@ -89,7 +110,7 @@ struct MyHandlerServer{
 
 }
 
-impl MyHandlerServer {
+impl WSHandler {
 
     /// The information clients need to bootstrap.
     fn init_for_client(&mut self) -> String {
@@ -103,11 +124,11 @@ impl MyHandlerServer {
 	ret
     }
 
-    /// `MyHandlerServer` is constructed with three arguments: (1) The
+    /// `WSHandler` is constructed with three arguments: (1) The
     /// communication channel with clients (2) The channel to get
     /// messages from the factory that created this (3) Shared state.
-    /// Shared with all other `MyHandlerServer` objects and the
-    /// `MyFactoryServer` object that runs the show
+    /// Shared with all other `WSHandler` objects and the
+    /// `WSFactory` object that runs the show
     fn new(
 	// Talk to clients
 	out:ws::Sender,
@@ -131,12 +152,12 @@ impl MyHandlerServer {
     }
 
     /// `run` spawns a thread to listen for pedal state changes from
-    /// `MyFactoryServer`.  Then pass it on to the clients so they can
+    /// `WSFactory`.  Then pass it on to the clients so they can
     /// update their displays
     fn run(&mut self, rx:mpsc::Receiver<PedalState>){
 	// Listem for state updates
 	
-	println!("MyHandlerServer::run");
+	println!("WSHandler::run");
 	let out_t = self.out.clone();
     	thread::spawn(move || {
     	    loop {
@@ -146,7 +167,7 @@ impl MyHandlerServer {
     		    Ok(s) => s,
 
     		    Err(err) => {
-    			println!("MyHandlerServer: {:?}", err);
+    			println!("WSHandler: {:?}", err);
     			break;
     		    }
     		};
@@ -168,7 +189,7 @@ impl MyHandlerServer {
     }
 }
 
-impl MyFactoryServer {
+impl WSFactory {
 
     fn new() -> Self {
 	let ret = Self {
@@ -183,7 +204,7 @@ impl MyFactoryServer {
     /// their displays
     fn run(&mut self, rx:mpsc::Receiver<PedalState>) -> 
 	Option<thread::JoinHandle<()>> {
-	    println!("MyFactoryServer::run");
+	    println!("WSFactory::run");
 
 	    // Copy of the transmiters to send data to each Handler	    
 	    let arc_txs = self.txs.clone();
@@ -209,17 +230,17 @@ impl MyFactoryServer {
 	}
 }
 
-impl ws::Factory for MyFactoryServer {
-    type Handler = MyHandlerServer;
+impl ws::Factory for WSFactory {
+    type Handler = WSHandler;
     fn connection_made(&mut self, out: ws::Sender) -> Self::Handler{
 	let (tx, rx) = mpsc::channel();
 	self.txs.lock().unwrap().push(tx);
 	println!("Server handing out a Handler");
-        MyHandlerServer::new(out, rx, self.server_state.clone())
+        WSHandler::new(out, rx, self.server_state.clone())
     }
 }
 
-impl ws::Handler for MyHandlerServer {
+impl ws::Handler for WSHandler {
 
     /// What is this doing?  Why?
     fn on_request(&mut self, req: &ws::Request) -> ws::Result<ws::Response> {
@@ -330,13 +351,19 @@ impl ws::Handler for MyHandlerServer {
 }
 
 fn set_pedal(p:char){
-    info!("Unimplemented pedal {}", p);
+    info!("Pedal {}", p);
+    run_control(&ControlType::Command(format!("p {}", p)));
+    info!("Pedal done {}", p);
 }
-fn set_instrument(file_path:&str) {
 
+/// Access the `control` binary.  This will block!
+enum ControlType {
+    File(String),
+    Command(String),
+}
+fn run_control(command:&ControlType) {
 
-    info!("set_instrument: file_path {}", file_path);
-
+    // Get the root directory where`control` lives
     let dir = match env::var("PATH_MI_ROOT"){
 	Ok(d) => d,
 	Err(_) => {
@@ -346,19 +373,39 @@ fn set_instrument(file_path:&str) {
 	},
     };
 
+    
     let exec_name = format!("{}/control", dir);
 
-    let cmd = format!("{} {}", exec_name, file_path);
-    let mut child = Command::new(exec_name.as_str())
-	.arg(file_path)
-	.spawn()
-	.expect("Failed");
+    let mut child = match command {
+	ControlType::File(file_path) => Command::new(exec_name.as_str())
+	    .arg(file_path)
+	    .spawn()
+	    .expect("Failed"),
+	ControlType::Command(cmd) => {
+	    let mut process = Command::new(exec_name.as_str())
+		.stdin(Stdio::piped())
+		.spawn()
+		.expect("Failed");
+	    let mut stdin = process.stdin.take().unwrap();
+	    stdin.write_all(cmd.as_bytes())
+		.expect("Failed to send cmd");
+	    process
+	},
+    };
+    
     let ecode = child.wait()
                  .expect("failed to wait on child");
     let res = ecode.success();
     info!("set_instrument: res: {}", res);
     assert!(res);
-    info!("set_instrument: {}", cmd);
+    
+    
+}
+
+fn set_instrument(file_path:&str) {
+    info!("set_instrument: file_path {}", file_path);
+    run_control(&ControlType::File(file_path.to_string()));
+    info!("set_instrument done");
 }
 
 fn send_message(server_msg: shared::ServerMessage,
@@ -492,7 +539,7 @@ fn main() -> std::io::Result<()>{
     // Create channel to communicate with the server.  
     let (tx, rx) = mpsc::channel();
 
-    let mut my_factory = MyFactoryServer::new();
+    let mut my_factory = WSFactory::new();
     let server_handle = my_factory.run(rx);
     let wss = ws::WebSocket::new(my_factory).unwrap();
 
