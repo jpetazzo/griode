@@ -63,7 +63,6 @@ struct ServerState {
 }
 
 impl ServerState {
-
     fn new() -> Self {
 	load_instruments()
     }  
@@ -126,9 +125,9 @@ impl WSHandler {
 
     /// `WSHandler` is constructed with three arguments: (1) The
     /// communication channel with clients (2) The channel to get
-    /// messages from the factory that created this (3) Shared state.
-    /// Shared with all other `WSHandler` objects and the
-    /// `WSFactory` object that runs the show
+    /// messages from the server (3) Shared state.  Shared with all
+    /// other `WSHandler` objects and the `WSFactory` object that runs
+    /// the show
     fn new(
 	// Talk to clients
 	out:ws::Sender,
@@ -221,8 +220,8 @@ impl WSFactory {
 		    set_pedal(state.state);
 		    for tx in &*arc_txs.lock().unwrap() {
 		        match tx.send(state) {
-			    Ok(x) => println!("FactoryServer sent: {:?}", x),
-			    Err(e) => println!("FactoryServer err: {:?}", e),
+			    Ok(x) => println!("WSFactory sent: {:?}", x),
+			    Err(e) => println!("WSFactory err: {:?}", e),
 			};
 		    }
 		};
@@ -375,7 +374,13 @@ fn run_control(command:&ControlType) {
 
     
     let exec_name = format!("{}/control", dir);
-
+    info!("exec_name {} {}", exec_name,
+	  match command {
+	      ControlType::File(file_path) =>
+		  format!("File {}", file_path),
+	      ControlType::Command(cmd) =>
+		  format!("Command {}", cmd),
+	  });
     let mut child = match command {
 	ControlType::File(file_path) => Command::new(exec_name.as_str())
 	    .arg(file_path)
