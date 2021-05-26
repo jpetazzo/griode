@@ -19,7 +19,7 @@ my $griode_port = 8887;
 ## devices attached to the server that get set up by "song" files
 ## (FIXME "song" is wrong word.)  and when they signal the server it
 ## swaps inputs around.
-my @PEDALS = ('A', 'B', 'C'); ## Three pedals currently
+my @PEDALS = ('a', 'b', 'c'); ## Three pedals currently
 
 ## Root directory of the system
 my $ROOT =  $ENV{PATH_MI_ROOT};
@@ -53,19 +53,24 @@ sub getState() {
     open(my $in, $state_fn) or die "$!: Cannot read $state_fn";
     my $state_text = join('', <$in>);
     {
+	## $state_text is Perl defining global state
 	no strict;
 	my $state_ref = eval $state_text;
-	%state = %$state_ref;
+	if(defined($state_ref)){
+	    %state = %$state_ref;
+	}else{
+	    %state = ();
+	}
     }
     ## Check for pedals
     defined($state{'pedals'}) or $state{'pedals'} = {};
     foreach my $pedal (@PEDALS){
 	defined $state{'pedals'}->{$pedal} and next;
-	$state{'pedals'}->{$pedal} = {'capture' => []};
+	$state{'pedals'}->{$pedal} = {'capture' => {}};
     }
 
-    ## Check stdin state initialised
-    defined($state{'capture'}) or $state{'capture'} = [];
+    ## Current capture set
+    defined($state{'capture'}) or $state{'capture'} = {};
     
     return %state;
 }
@@ -103,22 +108,23 @@ sub pedal( $ ) {
     ## The disconnection commands go first.  Need to check, it may be
     ## better to do these last to avoid audible effects... Need to
     ## experiment
-    foreach my $capture (@{$state{'capture'}}){
+    foreach my $capture (keys %{$state{'capture'}}){
 	push(@capture_cmds, "disconnect $capture");
     }    
-    $state{'capture'} = [];
+    $state{'capture'} = {};
 
     ## Collect the connections to turn on the new command
-    foreach my $capture (@{$state{"pedals"}->{$pedal} }){
-	scalar(@$capture) == 2 or die "Invalid state for pedal '$pedal'";
-	my $connection = "$capture->[0] $capture->[1]";
-	push(@capture_cmds, "connect $connection");
-	push(@{$state{'capture'}}, $connection);
+    foreach my $capture (keys %{$state{"pedals"}->{$pedal}->{'capture'}}){
+	## $capture of forom: system:capture_2 effect_1002:in
+	push(@capture_cmds, "connect $capture");
+	$state{'capture'}->{$capture} = 1; 
     }
 
     ## Use mod_host to adust the connections.  Much faster than
     ## `jack_connect` and `jack_disconnet`
+    print "Calling mod_host\n";
     mod_host(\@capture_cmds);
+    print "Called mod_host(".join(', ', @capture_cmds).")\n";
 }
 
 sub setup_pedal( $ ) {
@@ -159,15 +165,30 @@ sub setup_pedal( $ ) {
 	my $c = $2;
 	if($t eq 'mh'){
 	    push(@mod_host, $c);
-	}elsif($c eq 'jack'){
+	}elsif($t eq 'jack'){
 
-	    ## Treat system:capture_N connections differently.  This
-	    ## is so switching pedals is simply a matter of
-	    ## reconnecting system:capture_N
+	    if($c =~ /^system:capture_\d+\s/){
+		## Treat system:capture_N connections differently.
+		## This is so switching pedals is simply a matter of
+		## reconnecting system:capture_N
+		$state{"pedals"}->{$pedal}->{'capture'}->{$c} = 1;
+	    }else{
+		push(@jack, $c);
+	    }
 	}else{
 	    die "Do not understand pedal command '$c' from '$file' line $ln";
 	}
-	
+    }    
+    if(@mod_host){
+	&mod_host(\@mod_host);
+    }
+    write_history(map{'mod-host '. $_} @mod_host);
+    if(@jack){
+	foreach my $cmd (@jack){
+	    ## Use mod_host here.  Much quicker
+	    `jack_connect $cmd`;
+	    write_history(('jack '.$cmd));
+	}
     }
 }
 
@@ -231,7 +252,7 @@ sub mod_host( $ ){
 	    #     the status returned is the instance number. The
 	    #     value field currently only exists for the param_get
 	    #     command.
-	    if($1 < 0){
+	    if($1 < 0 and $1 != -2){
 		warn ">> $cmd >>  $result";
 	    }
 	}else{
@@ -307,17 +328,6 @@ if(scalar(@ARGV) == 0){
 
 $state{"ran"} = scalar(localtime(time()));
 
-# Proof of concept for saving state
-# $state{"pedals"} = {};
-# $state{"pedals"}->{A} = {};
-# $state{"pedals"}->{A}->{capture} = [];
-# push(@{$state{"pedals"}->{A}->{capture}},
-#      ["system:capture_1 ", "effect_1002:in"]);
-# push(@{$state{"pedals"}->{A}->{capture}},
-#      ["system:capture_2 ", "effect_1002:in"]);
-
-#print join("\n", @stdin)."\n---\n";
-
 # Place tostore commands before being executed.
 my @griode = ();
 my @modhost = ();
@@ -339,8 +349,11 @@ foreach my $line (@stdin){
     $line =~ /^(\S+)\s?(.*)?/ or die $line;
     my $arg1 = $1;
     my $args = defined($2) ? $2 : "";
-    
-    if($arg1 eq 'griode'){
+    if($arg1 eq 'p'){
+	# can only be one.  If there were more than one the last one
+	# wins
+	pedal($args);
+    }elsif($arg1 eq 'griode'){
 	# Send a command to griode
 	push(@griode, $args);
     }elsif($arg1 eq 'mh'){
@@ -373,10 +386,14 @@ foreach my $line (@stdin){
 		}	    
 	    }
 	    map {`jack_disconnect $_`} keys %jack_hist;
-	    map{  mod_host([["remove", "remove $_"]])} keys %modh_hist;
+	    my @mh = ();
+	    foreach my $h (keys %modh_hist){
+		push(@mh, "remove $h");
+	    }
+	    mod_host(\@mh);
 	    # warn "Deleted history\n";
 
-	    unlink $history_fn;
+	    unlink $history_fn or die "$! '$history_fn'";
 	}
     }elsif($arg1 eq 'pedal'){
 	push(@pedals, $args);
