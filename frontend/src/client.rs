@@ -5,8 +5,8 @@ mod shared;
 use chrono::{Local, DateTime};
 const WS_URL: &str = "ws://patchbox.local:9000/ws";
 
-// The selected instrument is either initialising (when it has been
-// selected but before it is...)  or ready
+/// The selected instrument is either initialising (when it has been
+/// selected but before it is...)  or ready
 #[derive(PartialEq)]
 enum SelectedState {
     Initialising,
