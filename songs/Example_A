@@ -46,7 +46,7 @@ jack effect_2:right_out effect_3:right_in
 jack effect_3:output MI_OUT1
 jack effect_3:output MI_OUT2
 
-pedal A 1000ExamplePedal
-pedal B 1010ExamplePedal
-pedal C 1020ExamplePedal
+pedal a 1000ExamplePedal
+pedal b 1010ExamplePedal
+pedal c 1020ExamplePedal
 
