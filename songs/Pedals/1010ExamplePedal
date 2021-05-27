@@ -1,8 +1,4 @@
-
-
 mh add http://avwlv2.sourceforge.net/plugins/avw/ad 1012
-
-
 
 mh add http://guitarix.sourceforge.net/plugins/gxechocat#echocat 1013
 mh param_set 1013 drive 0.5
