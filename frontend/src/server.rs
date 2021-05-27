@@ -21,6 +21,7 @@ use std::sync::Mutex;
 use std::sync::mpsc;
 use std::thread;
 use std::time;
+use std::time::Instant;
 // https://docs.rs/ws/
 use ws;
 // use ws::{listen, CloseCode, Handler, Message, Request, Response,
@@ -310,7 +311,10 @@ impl ws::Handler for WSHandler {
 				set_instrument(
 				    server_state
 					.instruments.get(instrument_name).
-					unwrap()
+					expect(format!(
+					    "Instrument not found: {}",
+					    instrument_name).as_str()
+					)
 				);
 				server_state.selected_instrument =
 				    instrument_name.to_string();
@@ -351,8 +355,14 @@ impl ws::Handler for WSHandler {
 
 fn set_pedal(p:char){
     info!("Pedal {}", p);
-    run_control(&ControlType::Command(format!("p {}", p)));
-    info!("Pedal done {}", p);
+    let now1 = Instant::now();
+
+    // This takes a bit over 100ms.  Need to get it to 10ms.
+    // run_control(&ControlType::Command(format!("p {}", p)));
+
+
+    let now2 = Instant::now();
+    info!("Pedal done {}: {:?}", p, now2 - now1);
 }
 
 /// Access the `control` binary.  This will block!
