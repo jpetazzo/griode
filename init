@@ -103,7 +103,7 @@ sub run_fe {
     }
 }
 
-&run_fe;
+#&run_fe;
 wait;
 
 # Clean up
