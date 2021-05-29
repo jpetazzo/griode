@@ -339,17 +339,17 @@ fn set_pedal(p: char) {
     let now1 = Instant::now();
 
     // This takes a bit over 100ms.  Need to get it to 10ms.
-    // run_control(&ControlType::Command(format!("p {}", p)));
+    run_control(&ControlType::Command(format!("p {}", p)));
 
     let now2 = Instant::now();
     info!("Pedal done {}: {:?}", p, now2 - now1);
 }
 
-/// Access the `control` binary.  This will block!
 enum ControlType {
     File(String),
     Command(String),
 }
+/// Access the `control` binary.  This will block!
 fn run_control(command: &ControlType) {
     // Get the root directory where`control` lives
     let dir = match env::var("PATH_MI_ROOT") {
@@ -372,7 +372,7 @@ fn run_control(command: &ControlType) {
     );
     let mut child = match command {
         ControlType::File(file_path) => {
-	    let mut process = process::Command::new(exec_name.as_str())
+	    let process = process::Command::new(exec_name.as_str())
 		.arg(file_path)
 		.stdout(process::Stdio::piped())
 		.stderr(process::Stdio::piped())
@@ -540,23 +540,24 @@ fn main() -> std::io::Result<()> {
     let s_thread = thread::spawn(move || wss.listen("0.0.0.0:9000").unwrap());
 
     let pedal_thread = thread::spawn(move || {
-        // initscr();
-        // loop {
-        //     let b = getch();
+        initscr();
+        loop {
+            let b = getch();
 
-        //     let c:char;
-        //     match b {
-        // 	97 => c = 'a',
-        // 	98 => c = 'b',
-        // 	99 => c = 'c',
-        // 	_ => continue,
-        //     };
-        //     tx.send(PedalState{state:c}).unwrap();
-
-        //     let onhundred_millis = time::Duration::from_millis(100);
-        //     thread::sleep(onhundred_millis);
-        // }
-        info!("Not running ncursers in server main loop any more");
+            let c:char;
+            match b {
+        	97 => c = 'a',
+        	98 => c = 'b',
+        	99 => c = 'c',
+        	_ => continue,
+            };
+	    set_pedal(c);
+            tx.send(PedalState{state:c}).unwrap();
+	    
+            let onhundred_millis = time::Duration::from_millis(100);
+            thread::sleep(onhundred_millis);
+        }
+        //info!("Not running ncursers in server main loop any more");
     });
 
     server_handle.unwrap().join().unwrap();
