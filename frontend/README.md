@@ -1,3 +1,27 @@
+# Building the Frontend
+
+Divided into two parts
+
+* Client code to run in a browser (wasm)
+
+* Server code to run the instrument hardware and communicate to the client via websockets
+
+They share a file in `frontend/src/shared.rs`  It is linked symbolically from `frontend/client/src/` and defines the data used by websockets for communication.
+
+## Build Client
+
+* Change directory to `frontend/client`
+
+* `cargo make build` or `cargo make build release`
+
+## Build Server
+
+* Change directory to `frontend/`
+
+* Run `cargo build --bin server --features server`
+
+
+
 # Seed Quickstart
 
 > Basic Rust-only template for your new Seed app.
@@ -64,6 +88,7 @@
   to = "/index.html"
   status = 200
 ```
+
 
 ## Other Seed quickstarts and projects
 
