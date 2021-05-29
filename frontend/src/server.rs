@@ -14,7 +14,7 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::io::Read;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process;
 use std::process::Stdio;
 use std::sync::mpsc;
 use std::sync::Arc;
@@ -148,7 +148,7 @@ impl WSHandler {
     fn run(&mut self, rx: mpsc::Receiver<PedalState>) {
         // Listem for state updates
 
-        println!("WSHandler::run");
+        info!("WSHandler::run");
         let out_t = self.out.clone();
         thread::spawn(move || {
             loop {
@@ -157,7 +157,7 @@ impl WSHandler {
                     Ok(s) => s,
 
                     Err(err) => {
-                        println!("WSHandler: {:?}", err);
+                        info!("WSHandler: {:?}", err);
                         break;
                     }
                 };
@@ -192,7 +192,7 @@ impl WSFactory {
     /// one is received send it to all the clients so they can update
     /// their displays
     fn run(&mut self, rx: mpsc::Receiver<PedalState>) -> Option<thread::JoinHandle<()>> {
-        println!("WSFactory::run");
+        info!("WSFactory::run");
 
         // Copy of the transmiters to send data to each Handler
         let arc_txs = self.txs.clone();
@@ -202,15 +202,15 @@ impl WSFactory {
                 let state = match rx.recv() {
                     Ok(s) => s,
                     Err(err) => {
-                        println!("Sender has hung up: {}", err);
+                        info!("Sender has hung up: {}", err);
                         break;
                     }
                 };
                 set_pedal(state.state);
                 for tx in &*arc_txs.lock().unwrap() {
                     match tx.send(state) {
-                        Ok(x) => println!("WSFactory sent: {:?}", x),
-                        Err(e) => println!("WSFactory err: {:?}", e),
+                        Ok(x) => info!("WSFactory sent: {:?}", x),
+                        Err(e) => info!("WSFactory err: {:?}", e),
                     };
                 }
             }
@@ -223,7 +223,7 @@ impl ws::Factory for WSFactory {
     fn connection_made(&mut self, out: ws::Sender) -> Self::Handler {
         let (tx, rx) = mpsc::channel();
         self.txs.lock().unwrap().push(tx);
-        println!("Server handing out a Handler");
+        info!("Server handing out a Handler");
         WSHandler::new(out, rx, self.server_state.clone())
     }
 }
@@ -371,19 +371,26 @@ fn run_control(command: &ControlType) {
         }
     );
     let mut child = match command {
-        ControlType::File(file_path) => Command::new(exec_name.as_str())
-            .arg(file_path)
-            .spawn()
-            .expect("Failed"),
+        ControlType::File(file_path) => {
+	    let mut process = process::Command::new(exec_name.as_str())
+		.arg(file_path)
+		.stdout(process::Stdio::piped())
+		.stderr(process::Stdio::piped())
+		.spawn()
+		.expect("Failed");
+	    process
+	},
         ControlType::Command(cmd) => {
-            let mut process = Command::new(exec_name.as_str())
+            let mut process = process::Command::new(exec_name.as_str())
                 .stdin(Stdio::piped())
+		.stdout(process::Stdio::piped())
+		.stderr(process::Stdio::piped())
                 .spawn()
                 .expect("Failed");
             let mut stdin = process.stdin.take().unwrap();
             stdin.write_all(cmd.as_bytes()).expect("Failed to send cmd");
             process
-        }
+        },
     };
 
     let ecode = child.wait().expect("failed to wait on child");
