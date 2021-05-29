@@ -50,10 +50,17 @@ pub struct Model {
     web_socket_reconnector: Option<StreamHandle>,
 }
 
+/// Instruments are stored as paths.
+fn path_to_name(p:&str) -> &str {
+    match p.rfind('/') {
+	Some(n) => p.get((n+1)..).unwrap(),
+	None => p,
+    }
+}
 // A little function that outputs the time string for now
 fn my_now() -> String {
     let dt: DateTime<Local> = Local::now();
-    return dt.to_rfc3339()
+    dt.to_rfc3339()
 }
 
 
@@ -123,7 +130,7 @@ fn decode_message(
 /// Called by `view` to generate some HTML code for a instrument.
 /// Returns the div for the instrument
 fn instrument_div(
-    instrument: String,
+    instrument: &String,
     pedal_state:char,
     height:f32, // Proportion of page
     selected:&Option<Selected>
@@ -135,7 +142,7 @@ fn instrument_div(
     let class = match selected {
 	None =>  "unselected",
 	Some(state) => {
-	    if state.name == instrument {
+	    if &state.name == instrument {
 		match state.state {
 		    SelectedState::Initialising => "initialising",
 		    SelectedState::Ready => "selected",
@@ -151,7 +158,8 @@ fn instrument_div(
 
     // To send to server on click.  Causes this instrument to be
     // selected
-    let message = format!("INSTR {}", &instrument);
+    let message = format!("INSTR {}", instrument);
+    log!("instrument_div: instrument: >> ", instrument);
 
     // HTML to return
     div![
@@ -159,7 +167,6 @@ fn instrument_div(
         ev(
 	    Ev::Click,
 	    {
-		// log!(my_now(), my_now(), "Ev::Click Setup", instrument);
 		let instrument_clone = instrument.clone();
 		// Return the closure to execute if there is a click
 		move |_| {
@@ -180,13 +187,13 @@ fn instrument_div(
 		// a particular piece of hardware, a assumtion, or a
 		// definition?
 		St::FontSize =>
-		    format!("{}em", (10.0 * height_div_percent) as f64/100.0),
+		    format!("{}em", (10.0 * height_div_percent) as f32/100.0),
 		
 		St::WordWrap => "break-word".to_string()
 	    ],
 
 	    // The text content
-	    format!("{}", &instrument),
+	    instrument,
 
 	    // Three states for a pedal
 	    span![
@@ -198,7 +205,6 @@ fn instrument_div(
 			   "pedal-a"
 		       },
 		],
-		"&nbsp;"
 	    ],
 	    span![
 		attrs![At::Width => "33%",
@@ -208,7 +214,6 @@ fn instrument_div(
 			   "pedal-b"
 		       },
 		],
-		"&nbsp;"
 	    ],
 	    span![
 		attrs![At::Width => "33%",
@@ -218,7 +223,6 @@ fn instrument_div(
 			   "pedal-c"
 		       },
 		],
-		"&nbsp;"
 	    ],
 	]
     ]
@@ -248,7 +252,7 @@ fn update(
     mut model: &mut Model,
     orders: &mut impl Orders<Msg>
 ) {
-    log!(my_now(), format!("update"));
+    log!(my_now(), "update");
     match msg {
 
 	// Opened a websocked.  Send a message asking for data to
@@ -268,7 +272,7 @@ fn update(
             model.sent_messages_count += 1;
             log!(my_now(), message_text);
 
-        }
+        },
 
 	// The server has sent some information.
         Msg::TextMessageReceived(message) => {
@@ -282,12 +286,12 @@ fn update(
 	    // spaces in instrument names
 	    let cmds:Vec<&str> = message.text.split_whitespace().collect();
 
-	    match cmds[0] {
+	    match cmds.get(0).unwrap() {
 
 		// The data needed to establisg the client state.  The
 		// selected instrument (in .Ready state), the possable
 		// instruments
-		"INIT" => {
+		&"INIT" => {
 		    assert!(cmds.len() > 2);
 		    log!(my_now(), "Got INIT");
 		    model.instruments.clear();
@@ -296,15 +300,16 @@ fn update(
 			name: cmds[1].to_string(),
 			state: SelectedState::Ready,
 		    });
-		    for i in 2..cmds.len() {
-			log!(my_now(), format!("Got instrument {}", cmds[i]));
-			model.instruments.push(cmds[i].to_string())
-		    }			
-		},
+		    //for i in 2..cmds.len() {
+		    for item in cmds.iter().skip(2) {
+			log!(my_now(), format!("Got instrument {}", &item));
+			model.instruments.push(item.to_string());
+		    }
+		},			
 
 		// Pedal used on server
-		"PEDALSTATE" => {
-		    model.pedal_state = cmds[1].chars().nth(0).unwrap();
+		&"PEDALSTATE" => {
+		    model.pedal_state = cmds[1].chars().next().unwrap();
 		},
 
 		// Otherwise we are getting told which instrument has
@@ -313,7 +318,7 @@ fn update(
 		    log!(my_now(), format!("Got instrument: {}", &instrument));
 		    model.selected = Some(
 			Selected {
-			    name:instrument.to_string(),
+			    name:(*instrument).to_string(),
 			    state: SelectedState::Ready
 			}
 		    );
@@ -323,14 +328,14 @@ fn update(
 	    // Why? AFAICT model::messages grows monotonically for no
 	    // purpose
             model.messages.push(message.text);
-	}
+	},
 	
 	// We do not use binary messages.  
 	Msg::BinaryMessageReceived(message) => {
             log!(my_now(), "Client received binary message");
 	    panic!("Binary message received: {:?}", message);
             //model.messages.push(message.text);
-	}
+	},
 
 	Msg::CloseWebSocket => {
             log!(my_now(), "Client received CloseWebsocket");
@@ -339,7 +344,7 @@ fn update(
 		.web_socket
 		.close(None, Some("user clicked Close button"))
 		.unwrap();
-	}
+	},
 
 	Msg::WebSocketClosed(close_event) => {
             log!("==================");
@@ -355,7 +360,7 @@ fn update(
                     orders.stream_with_handle(streams::backoff(None, Msg::ReconnectWebSocket)),
 		);
             }
-	}
+	},
 
 	Msg::WebSocketFailed => {
             log!(my_now(), "WebSocket failed");
@@ -364,22 +369,22 @@ fn update(
                     orders.stream_with_handle(streams::backoff(None, Msg::ReconnectWebSocket)),
 		);
             }
-	}
+	},
 
 	Msg::ReconnectWebSocket(retries) => {
             log!(my_now(), "Reconnect attempt:", retries);
             model.web_socket = create_websocket(orders);
-	}
+	},
 
 	Msg::InputTextChanged(text) => {
             log!(my_now(), "Client received InputTextChanged");
             model.input_text = text;
-	}
+	},
 
 	Msg::InputBinaryChanged(text) => {
             log!(my_now(), "Client received InputBinaryChanged");
             model.input_binary = text;
-	}
+	},
 
 	Msg::SendMessage(msg) => {
 	    // If `msg` is: "INSTR <instrument>" then we are telling
@@ -398,14 +403,14 @@ fn update(
             model.web_socket.send_json(&msg).unwrap();
             model.input_text.clear();
             model.sent_messages_count += 1;
-	}
+	},
 
 	Msg::SendBinaryMessage(msg) => {
             let serialized = rmp_serde::to_vec(&msg).unwrap();
             model.web_socket.send_bytes(&serialized).unwrap();
             model.input_binary.clear();
             model.sent_messages_count += 1;
-	}
+	},
     }
 }
 
@@ -422,11 +427,12 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     // meaningful existence
     if model.web_socket.state() == web_socket::State::Open {
 	
-	for i in model.instruments.iter() {
-	    // log!(format!("{} View: Instrument: {}", my_now(), i));
+	for i in &model.instruments {//.iter() {
+	    log!(my_now(), "View: Instrument: ", i);
+	    
 	    ret.push(
 		instrument_div(
-		    i.clone(),
+		    &path_to_name(i.as_str()).to_string(),
 		    model.pedal_state,
 		    1.0_f32/model.instruments.len() as f32,
 		    &model.selected,
