@@ -372,12 +372,20 @@ fn run_control(command: &ControlType) {
     );
     let mut child = match command {
         ControlType::File(file_path) => {
-	    let process = process::Command::new(exec_name.as_str())
+	    let mut process = process::Command::new(exec_name.as_str())
 		.arg(file_path)
 		.stdout(process::Stdio::piped())
 		.stderr(process::Stdio::piped())
 		.spawn()
 		.expect("Failed");
+            let mut stdout = process.stdout.take().unwrap();
+	    let mut output:Vec<u8> = Vec::new();
+	    stdout.read_to_end(&mut output).unwrap();
+	    info!("Control stdout: {}", String::from_utf8(output).unwrap());
+            let mut stderr = process.stderr.take().unwrap();
+	    let mut errput:Vec<u8> = Vec::new();
+	    stderr.read_to_end(&mut errput).unwrap();
+	    info!("Control stderr: {}", String::from_utf8(errput).unwrap());
 	    process
 	},
         ControlType::Command(cmd) => {
