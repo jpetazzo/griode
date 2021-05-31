@@ -7,7 +7,7 @@ const WS_URL: &str = "ws://patchbox.local:9000/ws";
 
 /// The selected instrument is either initialising (when it has been
 /// selected but before it is...)  or ready
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 enum SelectedState {
     Initialising,
     Ready,
@@ -18,7 +18,7 @@ enum SelectedState {
 /// `SelectedState::Initialising`.  When the server responds that the
 /// instrument is ready the state is changed to
 /// `SelectedState::Ready`.
-#[derive(PartialEq)]
+#[derive(PartialEq, Debug)]
 struct Selected {
     name:String,
     state: SelectedState,
@@ -131,27 +131,38 @@ fn decode_message(
 /// Returns the div for the instrument
 fn instrument_div(
     instrument: &String,
-    pedal_state:char,
+    pedal_name: String,
     height:f32, // Proportion of page
     selected:&Option<Selected>
 ) -> Node<Msg> {
 
+    log!(format!("instrument_div {} {} {} {:?} ",
+		 instrument, pedal_name, height, selected).as_str());
+    
     // If this instrument is the selected instrument the class will be
     // "initialising" or "selected" depending on whether the server
     // has confirmed it is ready.  Else it is "unselected"
+    let active:bool;
     let class = match selected {
-	None =>  "unselected",
+	None =>  {
+	    active = false;
+	    "unselected"
+	},
 	Some(state) => {
 	    if &state.name == instrument {
+		active = true;
 		match state.state {
 		    SelectedState::Initialising => "initialising",
 		    SelectedState::Ready => "selected",
 		}
 	    }else{
+		active = false;
 		"unselected"
 	    }
 	},
     };
+
+    log!(if active { "active"}else{"inactive"});
     
     // For CSS height is in percent.  0 < height < 1
     let height_div_percent = (100.0 * height).floor();
@@ -159,8 +170,6 @@ fn instrument_div(
     // To send to server on click.  Causes this instrument to be
     // selected
     let message = format!("INSTR {}", instrument);
-    log!("instrument_div: instrument: >> ", instrument);
-
     // HTML to return
     div![
 	C![class],	
@@ -180,7 +189,7 @@ fn instrument_div(
 	span![
 
 	    // The class of the span
-	    C!["instrument_name"],
+	    C!["instrument-name"],
 	    
 	    style![
 		// The whole page is 10em: ?? Is that a measurement of
@@ -193,37 +202,31 @@ fn instrument_div(
 	    ],
 
 	    // The text content
-	    instrument,
+	    if active {
+		span![
+		    style![
+			St::Float => "left",
+		    ],
+		    instrument
+		]
+	    }else{
+		span![
+		    instrument
+		]
+	    },
 
-	    // Three states for a pedal
-	    span![
-		attrs![At::Width => "33%",
-		       At::Class => 
-		       if pedal_state == 'a' {
-			   "pedal-a-selected"
-		       }else{
-			   "pedal-a"
-		       },
-		],
-	    ],
-	    span![
-		attrs![At::Width => "33%",
-		       At::Class => if pedal_state == 'b' {
-			   "pedal-b-selected"
-		       }else{
-			   "pedal-b"
-		       },
-		],
-	    ],
-	    span![
-		attrs![At::Width => "33%",
-		       At::Class => if pedal_state == 'c' {
-			   "pedal-c-selected"
-		       }else{
-			   "pedal-c"
-		       },
-		],
-	    ],
+	    if active {
+		span![
+		    style![
+			St::Float => "right",
+		    ],
+		    pedal_name
+		]
+	    }else{
+		span![
+		]
+	    },
+
 	]
     ]
 }
@@ -433,7 +436,7 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
 	    ret.push(
 		instrument_div(
 		    &path_to_name(i.as_str()).to_string(),
-		    model.pedal_state,
+		    format!("Pedal: {}", model.pedal_state),
 		    1.0_f32/model.instruments.len() as f32,
 		    &model.selected,
 		)
