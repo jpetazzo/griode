@@ -59,6 +59,11 @@ struct ServerState {
     // argument.  Stored as String not PathBuf because it is not
     // opened in Rust but passed to `control`
     instruments: HashMap<String, String>,
+
+    // A transmitter for each `Handle` so changes in state can be
+    // propagated to the `WSHandler` objects, and thus to the clients.
+    // It is here so WSHandler objects can delete themselves
+    txs: HashMap<usize, mpsc::Sender<PedalState>>,
 }
 
 impl ServerState {
@@ -86,10 +91,6 @@ impl ServerState {
 /// Currently only from STDIN so for guitar efects....
 
 struct WSFactory {
-    // A transmitter for each `Handle` so changes in state can be
-    // propagated to the `WSHandler` objects, and thus to the
-    // clients
-    txs: Arc<Mutex<Vec<mpsc::Sender<PedalState>>>>,
 
     // The state of the server.  It is shared state, shared with the
     // `WSHandler` objects.  They can change it
@@ -139,6 +140,7 @@ impl WSHandler {
         // `run` spawns a thread and runs in background broadcasting
         // changes in state to clients
         ret.run(rx);
+	info!("New handler: {:?}", &ret.out.token());
         ret
     }
 
@@ -170,7 +172,8 @@ impl WSHandler {
                     text: content,
                 };
 
-                match send_message(message, &out_t) {
+                info!("sending message: {:?}", message);
+		match send_message(message, &out_t) {
                     Ok(_) => (),
                     Err(err) => panic!("{}", err),
                 };
@@ -182,7 +185,6 @@ impl WSHandler {
 impl WSFactory {
     fn new() -> Self {
         let ret = Self {
-            txs: Arc::new(Mutex::new(Vec::new())),
             server_state: Arc::new(Mutex::new(ServerState::new())),
         };
         ret
@@ -191,11 +193,12 @@ impl WSFactory {
     /// Spawn a thread to listen for pedal changes on the rx.  When
     /// one is received send it to all the clients so they can update
     /// their displays
-    fn run(&mut self, rx: mpsc::Receiver<PedalState>) -> Option<thread::JoinHandle<()>> {
+    fn run(&mut self, rx: mpsc::Receiver<PedalState>) ->
+	Option<thread::JoinHandle<()>> {
         info!("WSFactory::run");
 
         // Copy of the transmiters to send data to each Handler
-        let arc_txs = self.txs.clone();
+        let s_state = self.server_state.clone(); //lock().unwrap().txs.clone();
 
         Some(thread::spawn(move || {
             loop {
@@ -206,8 +209,9 @@ impl WSFactory {
                         break;
                     }
                 };
-                set_pedal(state.state);
-                for tx in &*arc_txs.lock().unwrap() {
+		let arc_txs = &s_state.lock().unwrap().txs;
+		info!("state: {:?} {} children", state, arc_txs.len());
+                for (_, tx) in arc_txs {
                     match tx.send(state) {
                         Ok(x) => info!("WSFactory sent: {:?}", x),
                         Err(e) => info!("WSFactory err: {:?}", e),
@@ -222,8 +226,17 @@ impl ws::Factory for WSFactory {
     type Handler = WSHandler;
     fn connection_made(&mut self, out: ws::Sender) -> Self::Handler {
         let (tx, rx) = mpsc::channel();
-        self.txs.lock().unwrap().push(tx);
-        info!("Server handing out a Handler");
+	let token:usize = out.token().into();
+        {
+	    let txs = & mut self.server_state.lock().unwrap().txs;
+	    txs.insert(token, tx);
+	    info!("connection_made({}): txs, len: {}", &token, txs.len());
+	}
+        info!("Server handing out a Handler: {}", token);
+        {
+	    let txs = & mut self.server_state.lock().unwrap().txs;
+	    info!("TEST {}: txs, len: {}", &token, txs.len());
+	}
         WSHandler::new(out, rx, self.server_state.clone())
     }
 }
@@ -331,11 +344,15 @@ impl ws::Handler for WSHandler {
             "WebSocket closing - client: {}, code: {} {:?}, reason: {}",
             client_id, code_number, code, reason
         );
+	match self.server_state.lock().unwrap().txs.remove(&client_id) {
+	    Some(_) => info!("Removed ws client {}", client_id),
+	    None => info!("Failed to remove ws client {}", client_id),
+	};
     }
 }
 
 fn set_pedal(p: char) {
-    info!("Pedal {}", p);
+    info!("set_pedal {}", p);
     let now1 = Instant::now();
 
     // This takes a bit over 100ms.  Need to get it to 10ms.
@@ -413,10 +430,14 @@ fn set_instrument(file_path: &str) {
     info!("set_instrument done");
 }
 
-fn send_message(server_msg: shared::ServerMessage, out: &ws::Sender) -> ws::Result<()> {
-    let server_msg: ws::Message = serde_json::to_string(&server_msg).unwrap().into();
-    out.broadcast(server_msg)
-}
+fn send_message(server_msg: shared::ServerMessage, out: &ws::Sender) ->
+    ws::Result<()> {
+	let token:usize = out.token().into();
+	info!("send_message {:?} to {}", &server_msg, &token);
+	let server_msg: ws::Message =
+	    serde_json::to_string(&server_msg).unwrap().into();
+	out.broadcast(server_msg)
+    }
 
 fn load_instruments() -> ServerState {
     // Build the list of song files (TODO "song" is a bad name!) and
@@ -518,6 +539,7 @@ fn load_instruments() -> ServerState {
     ServerState {
         selected_instrument: selected_instrument,
         instruments: instruments,
+        txs: HashMap::new(),
     }
 }
 
@@ -557,6 +579,7 @@ fn main() -> std::io::Result<()> {
         	97 => c = 'a',
         	98 => c = 'b',
         	99 => c = 'c',
+		100 => break, // 'd' quits
         	_ => continue,
             };
 	    set_pedal(c);
@@ -567,6 +590,7 @@ fn main() -> std::io::Result<()> {
         }
         //info!("Not running ncursers in server main loop any more");
     });
+
 
     server_handle.unwrap().join().unwrap();
     s_thread.join().unwrap();
