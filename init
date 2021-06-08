@@ -2,45 +2,51 @@
 use strict;
 my $ROOT =  $ENV{PATH_MI_ROOT};
 -d $ROOT or die "'$ROOT' is not a directory:";
+my $LV2_PATH = "$ROOT/lv2/plugins";
 
 
 my $GRIODE_PID_FILE = "$ROOT/.griode.pid";
 my $FE_PID_FILE = "$ROOT/.griode.pid";
 my $WS_PID_FILE = "$ROOT/.griode.pid";
-my $LV2_PATH = "$ROOT/lv2/plugins";
 
 ## Logging levels: DEBUG, INFO, WARNING, ERROR, and CRITICAL
 my $GRIODE_CMD = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
     " $ROOT/griode.py 2>&1 > /tmp/griode.log";
 
 # mod-host runs lv2 plugins
-my $MOD_HOST_EXE='/home/patch/mod-host/bin/mod-host';
+my $mod_host_name = "mod-host"; # Search for this in process tree
+my $MOD_HOST_EXE="/home/patch/mod-host/bin/$mod_host_name";
 -e $MOD_HOST_EXE or die $!;
-my $mod_host_cmd = "LV2_PATH=$LV2_PATH $MOD_HOST_EXE";
+my $mod_host_cmd = "LV2_PATH=$LV2_PATH $MOD_HOST_EXE -f 5556 -p 5555";
 
-my  $mod_host_running = grep{/$MOD_HOST_EXE/} `ps xww`;
-if(!$mod_host_running){
-    # Need to start mod-host
-    
-    print "Run: $mod_host_cmd\n";
+sub run_daemon( $$ ) {
+    my ($dir, $cmd) = @_;
 
     my $p = fork();
     if($p == 0) {
 	# Child
-	`$mod_host_cmd`;
+	chdir($dir) or die "$!: '$dir'";
+	`$cmd`;
 	exit;
     }else{
-	print "Started mod-host\n";
+	print "> started $p: $cmd\n";
     }
+    return $p;
+}    
+
+my  $sys_mod_host_running = grep{/$mod_host_name/} `ps xwwa`;
+if(!$sys_mod_host_running){
+    # Need to start mod-host
+    &run_daemon($ROOT, $mod_host_cmd);
 }else{
-    print "mod-host already running\n";
+    print "> mod-host already running\n";
 }
 
 # Check if jack running
 my $res =`jack_wait -c 2>/dev/null`;
 chomp $res;
 $res eq "running" or die "Jack is not running\n";
-print "jack running\n";
+print "> jack running\n";
 
 # Check griode is running
 my $running = 0;
@@ -51,16 +57,9 @@ if(-e  $GRIODE_PID_FILE){
 
 ## If it is not running, start it
 if(!$running){
-    my $pid = fork();
-    defined($pid) or die "$!: Cannot fork";
-    if($pid == 0){
-	# Child
-	exec "$GRIODE_CMD" or die "$!: Could not exec";
-    }else{
-	print "Ran $GRIODE_CMD\n";
-    }
+    &run_daemon($ROOT, $GRIODE_CMD);
 }else{
-    print "Griode running: Do not start it\n";
+    print "> griode already running\n";
 }
 
 sub run_fe {
@@ -76,14 +75,9 @@ sub run_fe {
     unless($pid  &&
 	   `ps x | grep $pid | grep -v grep`){
 	# Front end has not started
-	my $fe_pid = fork();
-	if($fe_pid == 0) {
-	    # child
-	    chdir 'frontend' ;
-	    exec $ws_server or die "$!: Cannot exec $ws_server";
-	}else{
-	    `echo $fe_pid > $FE_PID_FILE`;
-	}
+	my $dir = "$ROOT/frontend";
+	my $fe_pid =  &run_daemon($dir, $fe_server) ;
+	`echo $fe_pid > $FE_PID_FILE`;	
     }
 
     $pid = `cat $WS_PID_FILE`;
@@ -91,19 +85,16 @@ sub run_fe {
     unless($pid &&
 	   `ps x | grep $pid | grep -v grep`){
 	# Web socket server has has not started
-	my $ws_pid = fork();
-	if($ws_pid == 0) {
-	    # child
-	    chdir "frontend";
-	    exec $ws_server or die "$!: Could not exec: $ws_server";
-	    exit;
-	}else{
-	    `echo $ws_pid > $WS_PID_FILE`;
-	}
+	
+	my $dir = "$ROOT/frontend";
+	
+	my $ws_pid = &run_daemon($dir, $ws_server);
+	`echo $ws_pid > $WS_PID_FILE`;
     }
 }
 
 #&run_fe;
+# wait for children to all finish
 wait;
 
 # Clean up
