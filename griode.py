@@ -28,7 +28,10 @@ with open(".griode.pid", "w") as f:
 log_format = "[%(levelname)s] %(filename)s:%(lineno)d %(funcName)s() -> %(message)s"
 
 log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
-logging.basicConfig(level=log_level, format=log_format)
+logging.basicConfig(level=log_level,
+                    format=log_format,
+                    filename='/tmp/griode.log',
+                    filemode='w+')
 logging.debug("User: {}".format(getpass.getuser()))
 
 
@@ -102,7 +105,7 @@ class Griode(object):
             if "Launchpad S" in port_name:
                 klass = LaunchpadS
             if "Launchpad X" in port_name:
-                logging.debug("Got X")
+                logging.debug("Got X port_name '{}'".format(port_name))
                 klass = LaunchpadX
             if "Launchpad Mini" in port_name:
                 klass = LaunchpadS
@@ -113,9 +116,12 @@ class Griode(object):
                 if not initial:
                     logging.info("Detected hotplug of new device: {}".format(port_name))
                     time.sleep(4)
-                self.grids.append(klass(self, port_name))
 
-        logging.debug("klass: {}".format(klass))
+                logging.info("Here");
+                logging.debug("klass: {}".format(klass))
+                self.grids.append(klass(self, port_name))
+                logging.info("Here");
+
         for port_name in configured_ports - detected_ports:
             # Removing a device
             logging.info("Device {} is no longer plugged. Removing it."
