@@ -8,7 +8,7 @@ from palette import palette
 class LaunchPad(Grid):
 
     def __init__(self, griode, port_name):
-        logging.info("Opening grid device {}".format(port_name))
+        logging.info("Opening grid device '{}'".format(port_name))
         self.grid_in = mido.open_input(port_name)
         self.grid_out = mido.open_output(port_name)
         for message in self.setup:
@@ -19,12 +19,16 @@ class LaunchPad(Grid):
         logging.debug("grid_in {}".format(self.grid_in))
 
     def process_message(self, message):
-        # logging.debug("{} got message {}".format(self, message))
+        logging.debug("got message {}".format(message))
+        logging.info("Here");
 
         # OK this is a hack to use fluidsynth directly with the Launchpad Pro
         if getattr(message, "channel", None) == 8:
             self.griode.synth.send(message)
+            logging.info("Here");
             return
+
+        logging.info("Here");
 
         # Ignore aftertouch messages for now
         if message.type == "polytouch":
@@ -57,6 +61,7 @@ class LaunchPad(Grid):
             # (i.e. not when it is released, which corresponds to value=0)
             if message.value == 127:
                 gridget.button_pressed(led)
+        logging.info("Here");
 
     def tick(self, tick):
         # This is a hack to work around a bug on the Raspberry Pi.
@@ -112,7 +117,7 @@ class LaunchpadPro(LaunchPad):
     ]
 
 class LaunchpadX(LaunchPad):
-    logging.debug("...")
+    logging.debug("Launchpad X")
 
     palette = "RGB"
     message2led = {}
