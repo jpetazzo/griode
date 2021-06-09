@@ -4,20 +4,23 @@ my $ROOT =  $ENV{PATH_MI_ROOT};
 -d $ROOT or die "'$ROOT' is not a directory:";
 my $LV2_PATH = "$ROOT/lv2/plugins";
 
-
 my $GRIODE_PID_FILE = "$ROOT/.griode.pid";
 my $FE_PID_FILE = "$ROOT/.griode.pid";
 my $WS_PID_FILE = "$ROOT/.griode.pid";
 
 ## Logging levels: DEBUG, INFO, WARNING, ERROR, and CRITICAL
-my $GRIODE_CMD = 'LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack' .
-    " $ROOT/griode.py 2>&1 > /tmp/griode.log";
+my $GRIODE_CMD = "LOG_LEVEL=INFO GRIODE_AUDIO_DRIVER=jack $ROOT/griode.py 2>&1 > /tmp/griode.log";
 
 # mod-host runs lv2 plugins
 my $mod_host_name = "mod-host"; # Search for this in process tree
 my $MOD_HOST_EXE="/home/patch/mod-host/bin/$mod_host_name";
 -e $MOD_HOST_EXE or die $!;
 my $mod_host_cmd = "LV2_PATH=$LV2_PATH $MOD_HOST_EXE -f 5556 -p 5555";
+
+if(grep{/target\/release\/server/} `ps axww`){
+    ## Alredy running web socket server
+    exit;
+}
 
 sub run_daemon( $$ ) {
     my ($dir, $cmd) = @_;
@@ -62,38 +65,25 @@ if(!$running){
     print "> griode already running\n";
 }
 
-sub run_fe {
-
-    # Run the front end.  A web app using websockets.  SO need http
-    # server and web socket server
-    
-    my $ws_server = "cargo run --bin server --features server   ";
-    my $fe_server = "simple-http-server";
-
-    my $pid = `cat $FE_PID_FILE`;
-    chomp $pid;
-    unless($pid  &&
-	   `ps x | grep $pid | grep -v grep`){
-	# Front end has not started
-	my $dir = "$ROOT/frontend";
-	my $fe_pid =  &run_daemon($dir, $fe_server) ;
-	`echo $fe_pid > $FE_PID_FILE`;	
-    }
-
-    $pid = `cat $WS_PID_FILE`;
-    chomp $pid;
-    unless($pid &&
-	   `ps x | grep $pid | grep -v grep`){
-	# Web socket server has has not started
-	
-	my $dir = "$ROOT/frontend";
-	
-	my $ws_pid = &run_daemon($dir, $ws_server);
-	`echo $ws_pid > $WS_PID_FILE`;
-    }
+# Make sure front end server running that gets requests for the wassm
+# front end
+my $fe_running = grep{/simple-http-server/} `ps axww`;
+if(!$fe_running){
+    &run_daemon("$ROOT/frontend", "simple-http-server");
+}else{
+    print "> Not starting http server.  Already running \n";
 }
 
-#&run_fe;
+## lastly block on the server so it can get the stdin
+my $ws_server_running = grep{/target\/release\/server/} `ps axww`;
+if(!$ws_server_running){
+    chdir "$ROOT/frontend" or die $!;
+    exec("cargo run --bin server --features server --release");
+    die "At the end...";
+}else{
+    print "> Not starting ws server.  Already running \n";
+}
+
 # wait for children to all finish
 wait;
 
