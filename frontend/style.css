@@ -30,7 +30,7 @@ body,html,#app {
 
 .instrument-name{
     border: 1px solid red;
-    display: block;
+    display: inline;
     font-size: 5em;
     height: 50%;
     text-align: center;
@@ -38,35 +38,6 @@ body,html,#app {
     word-wrap: break-word;
 }
 
-.pedal-a {
-    left: 0;
-    background: #6ebf252b;
-}
-
-.pedal-a-selected  {
-    left: 0;
-    background:#6ebf25c9;
-}
-
-.pedal-b {
-    left: 33.333%;
-    background: #aa27271c;
-}
-
-.pedal-b-selected {
-    left: 33.333%;
-    background: #aa2727bf;
-}
-
-.pedal-c {
-    left: 66.667%;
-    background:#493ab40f;
-}
-
-.pedal-c-selected {
-    left: 66.667%;
-    background:#493ab4d4;
-}
 .pedal {
     width: 33%;
     border: 1px solid blue;
