@@ -11,7 +11,8 @@ $Data::Dumper::Purity = 1;
 
 # Communication with other programmes.  `mod_host` handles LV2
 # effects.  `griode` runs the Launchpad X controller.
-my $mod_host_port = 5555;
+my $mod_host_port_f = 5556;
+my $mod_host_port_p = 5555;
 my $griode_port = 8887;
 
 ## Pedals.  This defines what pedals there are.  Each pedal is named
@@ -64,6 +65,8 @@ sub getState() {
     }
     ## Check for pedals
     defined($state{'pedals'}) or $state{'pedals'} = {};
+
+    ## Some redesign here and we can loose the `@PEDALS` global
     foreach my $pedal (@PEDALS){
 	defined $state{'pedals'}->{$pedal} and next;
 	$state{'pedals'}->{$pedal} = {'capture' => {}};
@@ -85,14 +88,6 @@ sub saveState( $ ) {
     # }
 }
 
-sub meter_bridge {
-    my $pid_fn = "$ROOT.meter_bridge.pid";
-    if(-e $pid_fn){
-	my $pid = `cat $pid_fn`;
-	chomp $pid;
-	kill 'HUP' , $pid;
-    }
-}
 
 ## Called when a `pedal...` command received
 sub pedal( $ ) {
@@ -184,12 +179,18 @@ sub setup_pedal( $ ) {
     }
     write_history(map{'mod-host '. $_} @mod_host);
     if(@jack){
-	foreach my $cmd (@jack){
-	    ## Use mod_host here.  Much quicker
-	    `jack_connect $cmd`;
-	    write_history(('jack '.$cmd));
-	}
+	&jack_connections(\@jack);
     }
+}
+
+sub jack_connections( $ ) {
+    my @jack = @$_[0];
+    foreach my $cmd (@jack){
+	## Use mod_host here.  Much quicker
+	`jack_connect $cmd`;
+	write_history(('jack '.$cmd));
+    }
+
 }
 
 sub mod_host( $ ){
@@ -198,8 +199,8 @@ sub mod_host( $ ){
 
     my $pid =
 	open2(my $child_out, my $child_in,
-	      "/usr/bin/nc localhost $mod_host_port");
-    defined $pid or die "$!: Fork failed";
+	      "/usr/bin/nc localhost $mod_host_port_p");
+    defined $pid or die "$!: Fork failed to open mod-host cmd sink";
 
     foreach my $cmd (@cmds){
 	print $child_in "$cmd\n";
@@ -321,6 +322,9 @@ if(scalar(@ARGV) == 0){
     # One arg, a path
     open(my $in, $ARGV[0]) or die "$!: $ARGV[0]";
     @stdin = <$in>;
+}elsif(@ARGV == 2){
+    $ARGV[0] eq "-c" or die "Use -c";
+    @stdin = ($ARGV[1]);
 }
 
 # Get the state
@@ -338,6 +342,58 @@ my @pedals = ();
 # `mh`  a mod host parameter to set
 # Else a file name that holds commannds to initialise a instrument
 my $ln = 0;
+sub meter_bridge {
+    # my $pid_fn = "$ROOT.meter_bridge.pid";
+    # if(-e $pid_fn){
+    # 	my $pid = `cat $pid_fn`;
+    # 	chomp $pid;
+    # 	kill 'HUP' , $pid;
+    # }
+    my @jack_c = `jack_lsp -c`;
+    ## Who is connected to stdout?
+    my %stdout = ();
+    my $flag = 0;
+    foreach my $j (@jack_c){
+
+	# Test exit condition
+	$flag == 1 and $j =~ /^\S/ and $flag = 0;
+
+	$flag == 0 and $j =~ /^system:playback_/ and $flag = 1 and next;
+
+	$flag == 1 or next;
+
+	$j =~ /^\s+(\S+):(\S+)/ or next;
+	$stdout{"$1:$2"} = 1;
+    }
+
+    # `keys %stdout` is all jack routes to stdout.  If they are
+    # already connected to meter-bridge get rid of them
+    $flag = 0;
+    my $meter_pid;
+    foreach my $j (@jack_c){
+
+	# Test exit condition
+	$flag == 1 and $j =~ /^\S/ and $flag = 0;
+
+	if($flag == 0 and $j =~ /^bridge-(\d+):meter_2/){
+	     $flag = 1;
+	     $meter_pid = $1;
+	     next;
+	}
+	$flag == 1 or next;
+	
+
+	$j =~ /^\s+(\S+):(\S+)/ or next;
+	delete($stdout{"$1:$2"});
+    }
+    # `keys %stdout` is all jack routes to stdout that are not
+    # connected to bridge-3044:monitor_2.
+    my @cmd = map{"connect $_ bridge-$meter_pid:meter_2"} keys %stdout;
+    if(@cmd){
+	mod_host(\@cmd);
+    }
+    
+}
 foreach my $line (@stdin){
     $ln++;
     
@@ -353,6 +409,10 @@ foreach my $line (@stdin){
 	# can only be one.  If there were more than one the last one
 	# wins
 	pedal($args);
+    }elsif($arg1 eq 'b'){
+	# can only be one.  If there were more than one the last one
+	# wins
+	&meter_bridge;
     }elsif($arg1 eq 'griode'){
 	# Send a command to griode
 	push(@griode, $args);
@@ -417,11 +477,7 @@ if(@modhost){
 }
 if(@jack){
     # warn "jack\n";
-    foreach my $cmd (@jack){
-	## Use mod_host here.  Much quicker
-	`jack_connect $cmd`;
-	write_history(('jack '.$cmd));
-    }
+    &jack_connections(\@jack);
 }
 if(@pedals){
     foreach my $pedal (@pedals){
