@@ -73,9 +73,9 @@ impl ServerState {
 }
 
 /// Web Socket Server code: Two main classes: WSFactory, and
-/// WSHandler.  The WSFactory is (efectively) a singleton.  It runs
-/// the code that listens on the socked for client connections (see
-/// `client.rs`) and for each connection it builds a WSHandler.
+/// WSHandler.  The WSFactory is a singleton.  It runs the code that
+/// listens on the socked for client connections (see `client.rs`) and
+/// for each connection it builds a WSHandler.
 
 /// There is two way communication between the server and the clients.
 /// The clients issue commands to change the "song" file (FIXME
@@ -242,6 +242,7 @@ impl ws::Factory for WSFactory {
 }
 
 impl ws::Handler for WSHandler {
+
     /// What is this doing?  Why?
     fn on_request(&mut self, req: &ws::Request) -> ws::Result<ws::Response> {
         match req.resource() {
@@ -274,7 +275,7 @@ impl ws::Handler for WSHandler {
 
                 // The first word of the message (might be) is a command
                 let cmds: Vec<&str> = client_message.text.split_whitespace().collect();
-
+		info!("on_message {:?}", &client_msg);
                 let response = match cmds[0] {
                     // INIT from client is asking for the
                     // information it needs to initialise its
@@ -296,9 +297,12 @@ impl ws::Handler for WSHandler {
 
                         if cmds.len() > 1 {
                             let instrument_name = cmds[1];
-                            let mut server_state = self.server_state.lock().unwrap();
+                            let mut server_state =
+				self.server_state.lock().unwrap();
 
-                            match server_state.instruments.get(instrument_name) {
+                            match server_state.instruments.get(
+				instrument_name
+			    ) {
                                 Some(instrument) => {
                                     set_instrument(instrument);
                                     server_state.selected_instrument =
@@ -427,6 +431,7 @@ fn run_control(command: &ControlType) {
 fn set_instrument(file_path: &str) {
     info!("set_instrument: file_path {}", file_path);
     run_control(&ControlType::File(file_path.to_string()));
+    run_control(&ControlType::Command("b".to_string())); // Connect VU meter if there
     info!("set_instrument done");
 }
 
@@ -573,7 +578,7 @@ fn main() -> std::io::Result<()> {
         initscr();
         loop {
             let b = getch();
-
+	    info!("Got char: {}", b);
             let c:char;
             match b {
         	97 => c = 'a',
