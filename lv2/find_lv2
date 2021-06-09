@@ -3,7 +3,11 @@ use warnings;
 use strict;
 
 my @lv2_dirs = map{chomp; $_} `sudo find / -xdev -type d -name "*.lv2"`;
-my %lv2_dirs = (); # Unique directories.  Avoid duplicates
+
+
+# Collect directory names (uniquely) for LV2
+my %lv2_dirs = (); 
+
 foreach my $lv2_dir (@lv2_dirs){
 
     ## Only include directories with at least one *.so file
@@ -20,9 +24,11 @@ foreach my $lv2_dir (@lv2_dirs){
 	# Algorithm 1  If only one has a *.so file choose it
 	my $a2 =  `find  '$lv2_dirs{$lv2}' -name "*.so"`;
 	if(length($a2) == 0 and length($a1) > 0){
+	    die "Both must have .so files. ";
 	    $lv2_dirs{$lv2} = $lv2_dir;
 	    next;
 	}elsif(length($a2) > 0 and length($a1) == 0){
+	    die "Both must have .so files. ";
 	    # Happy with what we have
 	    next;
 	}
