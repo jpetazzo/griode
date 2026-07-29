@@ -58,7 +58,7 @@ class Griode(object):
         for port_name in detected_ports - configured_ports:
             # Detected a new device! Yay!
             klass = None
-            if "Launchpad Pro MIDI 2" in port_name:
+            if "Launchpad Pro Standalone Port" in port_name:
                 klass = LaunchpadPro
             if "Launchpad MK2" in port_name:
                 klass = LaunchpadMK2
@@ -68,6 +68,8 @@ class Griode(object):
                 klass = LaunchpadS
             if "reface" in port_name:
                 klass = Keyboard
+            if klass is None:
+                logging.info("Detected unknown device ({}), ignoring it.".format(port_name))
             if klass is not None:
                 # FIXME find a better way than this for hotplug!
                 if not initial:
