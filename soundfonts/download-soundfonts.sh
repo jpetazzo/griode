@@ -11,6 +11,7 @@ if ! [ -f "$FILENAME" ]; then
 	fi
 	unzip -p "$ARCHIVE" "$FILEPATH" > "$FILENAME"
 	rm "$ARCHIVE"
+        ln -s "$FILENAME" 0.sf2
 fi
 
 # Fluid SoundFont
@@ -24,9 +25,9 @@ if ! [ -f "$FILENAME" ]; then
 	fi
 	tar -Ozxf "$ARCHIVE" "$FILEPATH" > "$FILENAME"
 	rm "$ARCHIVE"
+        ln -s "$FILENAME" 1.sf2
 fi
 
 # AWE32 ROM dump
 URL="http://heretics-hexens.ucoz.com/1mgm.sf2"
 
-[ ! -e 0.sf2 ] && [ -e generaluser.sf2 ] && ln -s generaluser.sf2 0.sf2
