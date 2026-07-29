@@ -74,13 +74,21 @@ class Fluidsynth(object):
             logging.error("Please set GRIODE_AUDIO_DRIVER.")
             exit(1)
         logging.info("Using audio driver: {}".format(audio_driver))
-
         popen_args = [
             "fluidsynth", "-a", audio_driver,
             "-o", "synth.midi-bank-select=mma",
             "-o", "synth.sample-rate=44100",
             "-c", "8", "-p", "griode"
         ]
+        if audio_driver == "alsa":
+            alsa_device = os.environ.get("GRIODE_ALSA_DEVICE")
+            if alsa_device:
+                logging.info("GRIODE_ALSA_DEVICE is set to {}".format(alsa_device))
+                if os.path.exists("/proc/asound/{}".format(alsa_device)):
+                    logging.info("ALSA device {} found; passing it to fluidsynth.".format(alsa_device))
+                    popen_args.extend(["-o", "audio.alsa.device=plughw:" + alsa_device])
+                else:
+                    logging.warning("ALSA device {} not found. Fluidsynth will use default ALSA device.".format(alsa_device))
 
         # Invoke fluidsynth a first time to enumerate instruments
         logging.debug("Invoking fluidsynth to enumerate instruments...")

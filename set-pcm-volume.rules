@@ -1,0 +1,1 @@
+ACTION=="add", KERNEL=="controlC*", SUBSYSTEM=="sound", RUN+="/usr/bin/amixer --card $number sset PCM 0dB"

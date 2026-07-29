@@ -1,17 +1,21 @@
 # This is to be used on a Raspberry Pi, where the code is checked out
 # in /home/pi/griode. To install the unit:
-# systemctl enable $PWD/griode.service
+# systemctl enable $PWD/griode.service --now
+# And to make sure it keeps running even when not logged in:
+# loginctl enable-linger
 
 [Unit]
-Description=Griode
+Description=Griode (https://github.com/jpetazzo/griode)
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 
 [Service]
-WorkingDirectory=/home/pi/griode
-ExecStart=/home/pi/griode/griode.py
-User=pi
-Group=audio
+WorkingDirectory=%h/griode
+ExecStart=%h/griode/.venv/bin/python griode.py
 Restart=always
+
+# If you have a USB audio interface and want Griode to try it first,
+# specify its name here (as shown in /proc/asound/card*/id).
+#Environment=GRIODE_ALSA_DEVICE=AI1
 

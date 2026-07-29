@@ -1,0 +1,2 @@
+ACTION=="add", KERNEL=="pcmC*D*p", SUBSYSTEM=="sound", ATTRS{id}=="AI1", RUN+="/usr/bin/aplay -D hw:CARD=AI1 -t raw -f S24_3LE -r 44100 -c 2 /dev/null"
+

@@ -30,19 +30,24 @@ have a LaunchPad connected to an Debian/Ubuntu system.
 git clone git://github.com/jpetazzo/griode
 cd griode
 sudo apt-get install python3-pip python3-dev libasound2-dev libjack-dev fluidsynth
-pip3 install --user -r requirements.txt
+systemctl --user mask fluidsynth --now
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ( cd soundfonts; ./download-soundfonts.sh; )
-./griode.py
+.venv/bin/python griode.py
 ```
 
 Your LaunchPad should light up with a red and white pattern, and pressing
 pads should make piano sounds.
 
+(Curious about what all these commands and packages are?
+Keep reading, we'll explain a bit further!)
+
 
 ### Installing on a Raspberry Pi
 
-If you want to setup Griode on a Raspberry Pi, you can use the
-instructions above, but **make sure that you run them as the `pi` user.**
+If you want to setup Griode on a Raspberry Pi, if you are using Raspberry Pi OS,
+you can use the instructions above, since it's basically a Debian system.
 
 You can use the "lite" (text only) or the "desktop" version, it
 doesn't matter for Griode.
@@ -70,14 +75,16 @@ so that the `python-rtmidi` Python package can be installed correctly:
 apt-get install python3-dev libasound2-dev libjack-dev
 ```
 
-You can then install Griode's requirements with `pip`:
+You can then create a virtualenv for Griode's dependencies,
+and install these dependencies:
 
 ```bash
-pip install --user -r requirements.txt
+python -m venv .venv
+.venv/bin/pip install -r requirements.txt
 ```
 
-Of course, you are welcome to use `virtualenv` or anything like that
-if you want.
+Of course, if you want to use another system to manage the virtualenv
+and the dependencies (like `uv`), that's perfectly fine.
 
 If you get compilation errors, you might need extra packages (libraries or headers).
 
@@ -94,6 +101,17 @@ can install it with:
 
 ```
 apt-get install fluidsynth
+```
+
+By default, an instance of fluidsynth is started by a systemd user
+unit. Griode won't use that instance; it will start its own, so that
+it can pass special parameters and manage SoundFonts itself.
+That instance of fluidsynth shouldn't interfere with Griode's,
+but on resource-constrained systems (like Raspberry Pis) you may
+want to stop it; you can do it by masking it:
+
+```bash
+systemctl --user mask fluidsynth.service --now
 ```
 
 
@@ -179,8 +197,8 @@ After checking out the code in `/home/pi/griode`, and confirming that
 it runs correctly, just run:
 
 ```
-sudo systemctl enable /home/pi/griode/griode.service
-sudo systemctl start griode
+systemctl enable $PWD/griode.service --now
+loginctl enable-linger
 ```
 
 Griode will start, and it will be automatically restarted when the
@@ -189,9 +207,50 @@ Pi reboots.
 If it doesn't start, or if you want to see what's going on:
 
 ```
-sudo systemctl status griode
-sudo journalctl -u griode
+systemctl --user status griode
+journalctl --user -u griode
 ```
+
+
+## Setting output interface
+
+Two environment variables can influence which audio interface Griode
+will use (or, technically: which audio interface Griode will tell
+Fluidsynth to use).
+
+`GRIODE_AUDIO_DRIVER` can be set to `alsa`, `pulse`, or any value
+accepted by Fluidsynth. If that variable isn't set, then,
+if Griode detects a Pulseaudio socket, it will use Pulseaudio; otherwise, 
+it will use `alsa` on Linux, and `coreaudio` on MacOS.
+
+`GRIODE_ALSA_DEVICE` can be set to the name of an ALSA device,
+to tell Griode to *prefer* that device. If that device is detected,
+Griode will use it; otherwise it will fallback to the default ALSA
+device. This is meant to be used on Raspberry Pi with external USB
+audio interfaces: if the interface is detected, it will be used;
+otherwise, Griode will fallback to the built-in interface.
+
+To find the available names, you can run e.g. `find /proc/asound -type l`
+(there is a symbolic link for each sound card, and the name of the
+symlink is the name of the card).
+
+
+## Udev rules
+
+I find it useful to automatically set the volume of ALSA devices
+to the max (technically: to 0dB), especially on a Raspberry Pi
+when you can't easily run `alsamixer`. If you'd like to do that,
+just copy the file `set-pcm-volume.rules` to `/etc/udev/rules.d`.
+You don't need to restart or reload udev; but it will only take
+action next time an audio interface is detected (USB audio interfaces
+can be unplugged/replugged; built-in interfaces will require a reboot).
+
+Also, my RØDE AI-1 interface has a severe bug (I don't know yet if
+it's a defect on mine or a bug in their firmware or hardware): when
+it's used at 48 or 96 kHz, it generates a very loud digital noise on
+its output. To avoid that, I've also written a udev rule that sets
+that interface to 44.1 kHz as soon as it's detected. That rule is
+in the file `rode-ai-1.rules`.
 
 
 ## Bugs
