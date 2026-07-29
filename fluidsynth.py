@@ -89,7 +89,7 @@ class Fluidsynth(object):
         msg = ""
         for i, soundfont in enumerate(soundfonts):
             font_id = i+1
-            offset = i*1000
+            offset = font_id*1000
             msg += "load {} 1 {}\n".format(soundfont, offset)
             msg += "inst {}\n".format(font_id)
         self.fluidsynth.stdin.write(msg.encode("ascii"))
