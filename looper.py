@@ -385,8 +385,6 @@ class LoopController(Gridget):
         if button == "RIGHT":
             if self.looper.playing:
                 for loop in self.looper.loops_recording:
-                    # Save! Save all the things!
-                    loop.db.sync()
                     # I'm not sure that this logic should be here,
                     # but it should be somewhere, so here we go...
                     # When stopping, if any loop doesn't have a

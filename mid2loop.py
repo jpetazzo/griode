@@ -47,7 +47,3 @@ for message in midi_file:
 				loop.notes[start_tick] = []
 			loop.notes[start_tick].append(Note(message.note, 108, duration_tick))
 
-from persistence import cache
-for db in cache.values():
-	db.close()
-

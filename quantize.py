@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+raise NotImplemented("db isn't using shelve anymore.")
 
 import shelve
 import sys

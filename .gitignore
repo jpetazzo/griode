@@ -1,6 +1,5 @@
 __pycache__
 *.swp
 *.sf2
-*.sav
-*.db
 *~
+state/*.*.*

@@ -162,7 +162,6 @@ class DeviceChain(object):
 
 ##############################################################################
 
-PATTERN_SAVING = [(1, 1), (1, 2), (2, 1), (2, 2)]
 PATTERN_DONE = [(1, 1)]
 
 def show_pattern(griode, pattern, color_on, color_off):
@@ -180,9 +179,6 @@ def main():
         while True:
             griode.clock.once()
     except KeyboardInterrupt:
-        show_pattern(griode, PATTERN_SAVING, palette.ACTIVE, palette.BLACK)
-        for db in cache.values():
-            db.close()
         show_pattern(griode, PATTERN_DONE, palette.ACTIVE, palette.BLACK)
 
 
