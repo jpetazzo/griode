@@ -36,16 +36,19 @@ class Griode(object):
         self.clock = Clock(self)
         self.looper = Looper(self)
         self.mixer = Mixer(self)
-        self.detect_devices()
+        self.next_detection_time = time.time()
+        self.ignored_ports = set()
         # FIXME: probably make this configurable somehow (env var...?)
         if False:
             from termpad import ASCIIGrid
             self.grids.append(ASCIIGrid(self, 0, 1))
 
     def tick(self, tick):
-        pass
+        if time.time() > self.next_detection_time:
+            self.detect_devices()
+            self.next_detection_time = time.time() + 1
 
-    def detect_devices(self, initial=True):
+    def detect_devices(self):
         from launchpad import LaunchpadMK2, LaunchpadPro, LaunchpadS
         from keyboard import Keyboard
         logging.debug("Enumerating MIDI ports...")
@@ -55,7 +58,7 @@ class Griode(object):
         except:
             logging.exception("Error while enumerating MIDI ports")
             detected_ports = set()
-        for port_name in detected_ports - configured_ports:
+        for port_name in detected_ports - configured_ports - self.ignored_ports:
             # Detected a new device! Yay!
             klass = None
             if "Launchpad Pro Standalone Port" in port_name:
@@ -70,11 +73,8 @@ class Griode(object):
                 klass = Keyboard
             if klass is None:
                 logging.info("Detected unknown device ({}), ignoring it.".format(port_name))
+                self.ignored_ports.add(port_name)
             if klass is not None:
-                # FIXME find a better way than this for hotplug!
-                if not initial:
-                    logging.info("Detected hotplug of new device: {}".format(port_name))
-                    time.sleep(4)
                 self.grids.append(klass(self, port_name))
         for port_name in configured_ports - detected_ports:
             # Removing a device

@@ -38,6 +38,22 @@ class LaunchPad(Grid):
         elif message.type == "control_change":
             led = self.message2led.get(("CC", message.control))
 
+        if message.type == "sysex":
+            # When a LaunchPad Pro is hotplugged to Griode, Griode
+            # sends a sequence to initialize it, but it will typically
+            # send that sequence too fast - before it has fully booted.
+            # This results in the LaunchPad Pro being in its default
+            # "note" mode. One workaround is to detect this particular
+            # SysEx, which is sent by the LaunchPad Pro when it's done
+            # initializing (and means "I'm in note mode"), and then
+            # re-send the setup message.
+            if message.data == (0, 32, 41, 2, 16, 47, 0):
+                logging.info("Received LaunchPad Pro boot SysEx. Resetting mode.")
+                for message in self.setup:
+                    self.grid_out.send(message)
+                self.surface.redraw()
+                return
+
         if led is None:
             logging.warning("Unhandled message: {}".format(message))
             return
@@ -69,11 +85,13 @@ class LPSurface(object):
 
     def __init__(self, launchpad):
         self.launchpad = launchpad
+        self.state = {}
 
     def __iter__(self):
         return self.launchpad.led2message.__iter__()
 
     def __setitem__(self, led, color):
+        self.state[led] = color
         if isinstance(color, int):
             logging.warning("Raw color used: launchpad[{}] = {}".format(led, color))
         else:
@@ -84,6 +102,10 @@ class LPSurface(object):
         elif message_type == "CC":
             message = mido.Message("control_change", control=parameter, value=color)
         self.launchpad.grid_out.send(message)
+
+    def redraw(self):
+        for led in self.state:
+            self[led] = self.state[led]
 
 
 class LaunchpadPro(LaunchPad):
