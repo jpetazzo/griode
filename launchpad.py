@@ -130,6 +130,14 @@ class LaunchpadPro(LaunchPad):
         mido.Message("sysex", data=[0, 32, 41, 2, 16, 10, 99, 0]),
     ]
 
+    # Visual metronome; mostly as a debug aid to help troubleshoot when
+    # griode gets unresponsive. Blinks the "Click" button.
+    def tick(self, tick):
+        LaunchPad.tick(self, tick)
+        if tick % 24 in (0, 12):
+            color = (palette.ACTIVE if tick % 24 == 0 else palette.BLACK)[self.palette]
+            self.grid_out.send(mido.Message("control_change", control=70, value=color))
+
 
 class LaunchpadMK2(LaunchPad):
 
