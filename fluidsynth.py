@@ -76,6 +76,8 @@ class Fluidsynth(object):
         logging.info("Using audio driver: {}".format(audio_driver))
         popen_args = [
             "fluidsynth", "-a", audio_driver,
+            "-o", "synth.default-soundfont=",
+            "-o", "synth.dynamic-sample-loading=1",
             "-o", "synth.midi-bank-select=mma",
             "-o", "synth.sample-rate=44100",
             "-c", "8", "-p", "griode"
@@ -131,7 +133,7 @@ class Fluidsynth(object):
 
         # Find the MIDI port created by fluidsynth and open it
         logging.debug("Waiting for fluidsynth MIDI port to show up...")
-        deadline = time.time() + 5
+        deadline = time.time() + 10
         while time.time() < deadline:
             port_names = [p for p in mido.get_output_names() if "griode" in p]
             if port_names == []:
