@@ -1,8 +1,15 @@
-# This is to be used on a Raspberry Pi, where the code is checked out
-# in /home/pi/griode. To install the unit:
+# This file can be used to start Griode as a user service.
+# It assumes that the code is checked out in ~/griode, and
+# that a suitable virtualenv has been create in ~/griode/.venv.
+# 
+# To install this unit:
 # systemctl enable $PWD/griode.service --now
 # And to make sure it keeps running even when not logged in:
 # loginctl enable-linger
+#
+# NOTE: if you're running Griode on a Raspberry Pi or
+# another similar system and want Griode to start as fast
+# as possible, check the systemd-system/griode.service unit!
 
 [Unit]
 Description=Griode (https://github.com/jpetazzo/griode)
@@ -18,4 +25,3 @@ Restart=always
 # If you have a USB audio interface and want Griode to try it first,
 # specify its name here (as shown in /proc/asound/card*/id).
 #Environment=GRIODE_ALSA_DEVICE=AI1
-

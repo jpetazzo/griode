@@ -1,0 +1,38 @@
+# This file can be used to start Griode as a system service,
+# and to start as early as possible in the boot process.
+# This can be useful on Raspberry Pis and similar devices,
+# where we want Griode to come up as fast as possible.
+#
+# It assumes that the code is checked out in /home/pi/griode,
+# and that a suitable virtualenv has been created in
+# /home/pi/griode/.venv.
+# 
+# To install this unit:
+# systemctl enable $PWD/griode.service --now
+#
+# NOTE: if you're running Griode on a Raspberry Pi or
+# another similar system and want Griode to start as fast
+# as possible, check the systemd-system/griode.service unit!
+
+[Unit]
+Description=Griode (https://github.com/jpetazzo/griode)
+# Don't wait for "basic.target"
+DefaultDependencies=no
+# But wait for udevd (we need it for USB audio interfaces), sound, etc.
+After=systemd-udevd.service systemd-udev-trigger.service systemd-remount-fs.service sound.target
+# This makes sure that griode shuts down if we shutdown/reboot gracefully
+Conflicts=shutdown.target
+Before=shutdown.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+User=pi
+WorkingDirectory=/home/pi/griode
+ExecStart=/home/pi/griode/.venv/bin/python griode.py
+Restart=always
+
+# If you have a USB audio interface and want Griode to try it first,
+# specify its name here (as shown in /proc/asound/card*/id).
+#Environment=GRIODE_ALSA_DEVICE=AI1

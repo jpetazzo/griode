@@ -189,26 +189,50 @@ you can wipe out this directory (or some of the files therein).
 
 ### Starting automatically on boot
 
-If you are using a Raspberry Pi running the Raspbian distribution,
-and want to automatically start Griode on boot, you can use the provided
-systemd unit (`griode.service`).
+If you want to start Griode automatically on boot, we provide two
+systemd units to do that. This can be useful if you want to install
+Griode on a Raspberry Pi, and you want Griode to start automatically
+without needed to run commands on the Pi.
 
-After checking out the code in `/home/pi/griode`, and confirming that
-it runs correctly, just run:
+**Option 1: user unit.** This one should be the most portable,
+and doesn't require root access if you need to restart, check logs, etc.
 
+**Option 2: system unit.** This runs Griode as early as possible
+in the boot process. On a Raspberry Pi 3B with a cheap microSD card,
+this means that Griode is up and running ~15s after power on
+instead of 23s.
+
+Either way, you need to make sure that Griode runs correctly first.
+
+### User unit
+
+From the griode directory:
 ```
-systemctl enable $PWD/griode.service --now
+systemctl enable $PWD/systemd-user/griode.service --now
 loginctl enable-linger
 ```
 
-Griode will start, and it will be automatically restarted when the
-Pi reboots.
-
-If it doesn't start, or if you want to see what's going on:
-
+To see service status or view logs:
 ```
 systemctl --user status griode
 journalctl --user -u griode
+```
+
+### System unit
+
+Review the `systemd-system/griode.service` to make sure that
+the paths and username are valid for your installation.
+(System units require absolute paths.)
+
+Then:
+```
+systemctl enable $PWD/systemd-system/griode.service --now
+```
+
+To see service status or view logs:
+```
+systemctl status griode
+journalctl -u griode
 ```
 
 
